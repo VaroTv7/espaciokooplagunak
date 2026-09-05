@@ -527,6 +527,33 @@ export const PUERTO = Object.freeze({
 });
 
 /**
+ * El bosque.
+ *
+ * EXISTE PARA CERRAR UN SITIO, no para decorarlo. Un exterior con un borde por
+ * el que no se puede pasar necesita que ese borde sea algo que el sitio ya
+ * tendría —una arboleda en un claro, un muro en una mazmorra, un acantilado en
+ * un llano—; una nube puesta solo para tapar el vacío es un parche, y se nota
+ * porque no explica nada del lugar. La niebla del motor hace el resto: la PSX la
+ * usaba literalmente para que la geometría no apareciera de golpe en el borde.
+ *
+ * TRES TONOS DE FOLLAJE Y NO UNO, por la misma razón por la que una roca de la
+ * playa tiene su cara al sol: una masa de un solo verde es una mancha, y lo que
+ * hace que una arboleda tenga profundidad es que las copas cercanas cojan luz y
+ * las del fondo se apaguen. El seco no es un cuarto verde: es lo que impide que
+ * un bosque entero parezca de plástico recién comprado.
+ */
+export const BOSQUE = Object.freeze({
+  tronco: "#5b4632", // corteza en sombra, que es como se ve un tronco casi siempre
+  troncoSol: "#7a6046", // la banda del tronco a la que sí llega la luz
+  follaje: "#3f5f39", // la copa, verde apagado: ni esmeralda ni oliva
+  follajeSol: "#5d7f47", // lo alto de la copa, donde da el sol
+  follajeSombra: "#2b4229", // lo de debajo y lo del fondo de la arboleda
+  hojarasca: "#6b5a3c", // el suelo bajo los árboles, tierra con hoja caída
+  seco: "#8a7b52", // ramas muertas y helecho pasado: rompe el verde continuo
+  tocon: "#6a563d", // el corte de un tronco caído, más claro que su corteza
+});
+
+/**
  * La sala del museo (#598).
  *
  * Paleta propia y no `SECCION` por el mismo motivo que la playa tiene la suya:

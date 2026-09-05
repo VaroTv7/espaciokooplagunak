@@ -147,6 +147,10 @@ test("en el catálogo real ninguna sala se queda sin nada ni se llena de más", 
     // mobiliario cabe en una sala» sino cuántas parejas quiere mostrar la
     // escena, la misma excepción que el museo por el mismo motivo.
     if (id === "pasillo-recuerdos") continue;
+    // La arena de combate tampoco: sus obstáculos son la LINDE que la cierra
+    // —treinta y seis piezas de arboleda alrededor de 45 × 30 m—, no muebles de
+    // una sala. Medirla con el tope de un cuarto de nave no dice nada.
+    if (id === "arena") continue;
     const { obstaculos } = estancia.planta;
     assert.ok(obstaculos.length > 0, `${id} sigue vacía`);
     // Un tope por sala, no por mueble: lo que se paga es el conjunto.

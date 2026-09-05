@@ -49,6 +49,16 @@ export const NIVELES = Object.freeze([
     },
   }),
   Object.freeze({
+    id: "arena",
+    nombre: { es: "Arena de combate", en: "Combat arena" },
+    mira: {
+      es: "30 × 20 casillas de 5 ft, enteras jugables. Que la arboleda cierre de"
+        + " verdad el borde, y que cruzarla a pie se sienta como una distancia.",
+      en: "30 × 20 squares of 5 ft, all playable. That the treeline really closes"
+        + " the edge, and that crossing it on foot feels like a distance.",
+    },
+  }),
+  Object.freeze({
     id: "pasillo-recuerdos",
     nombre: { es: "Pasillo de los recuerdos", en: "Corridor of memories" },
     mira: {

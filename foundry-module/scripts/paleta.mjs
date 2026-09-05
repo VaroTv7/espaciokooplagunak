@@ -549,6 +549,13 @@ export const BOSQUE = Object.freeze({
   follajeSol: "#5d7f47", // lo alto de la copa, donde da el sol
   follajeSombra: "#2b4229", // lo de debajo y lo del fondo de la arboleda
   hojarasca: "#6b5a3c", // el suelo bajo los árboles, tierra con hoja caída
+  // Los DOS tonos del suelo de un claro. Muy juntos a propósito: alternarlos por
+  // casilla da escala —se ve cuánto es un paso sin que nadie lo diga— y con dos
+  // colores separados el suelo dejaría de ser suelo para leerse como una
+  // alfombra de rayas. Es el mismo criterio que la junta de suelo de #552, que
+  // tiene que ser una línea un punto más clara y solo un punto.
+  suelo: "#4e5c34", // hierba pisada de claro
+  sueloClaro: "#57663a", // la franja de al lado, apenas un punto por encima
   seco: "#8a7b52", // ramas muertas y helecho pasado: rompe el verde continuo
   tocon: "#6a563d", // el corte de un tronco caído, más claro que su corteza
 });

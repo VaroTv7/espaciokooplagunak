@@ -12,14 +12,21 @@ const LUCES = [
   ["contraluz", "filter:brightness(.48) contrast(1.5)"],
 ];
 
-function poligono(pieza) {
-  const puntos = pieza.malla.vertices.map(([x, y]) => `${(x * 170 + 100).toFixed(1)},${(y * -170 + 205).toFixed(1)}`);
-  return `<polygon points="${puntos}" fill="#b38b63" stroke="#241f2b" stroke-width="1"/>`;
+function poligonos(pieza) {
+  const [cx, cy] = pieza.centro;
+  return pieza.malla.caras.map((cara, indice) => {
+    const puntos = cara.map((vertice) => {
+      const [x, y] = pieza.malla.vertices[vertice];
+      return `${((cx + x) * 170 + 100).toFixed(1)},${((cy + y) * -170 + 205).toFixed(1)}`;
+    }).join(" ");
+    const tono = indice % 3 === 0 ? "#d2a276" : indice % 3 === 1 ? "#b8845d" : "#936747";
+    return `<polygon points="${puntos}" fill="${tono}" stroke="#241f2b" stroke-width=".7"/>`;
+  }).join("");
 }
 
 function avatarSvg(raza, silueta, estilo) {
   const piezas = piezasAvatar({ raza, silueta, gesto: "quieto" }, { pies: [0, 0, 0] });
-  return `<svg viewBox="0 0 200 230" aria-label="${raza}, ${silueta}, ${estilo}" style="${LUCES.find(([nombre]) => nombre === estilo)[1]}"><rect width="200" height="230" fill="#4d5364"/>${piezas.map(poligono).join("")}</svg>`;
+  return `<svg viewBox="0 0 200 230" aria-label="${raza}, ${silueta}, ${estilo}" style="${LUCES.find(([nombre]) => nombre === estilo)[1]}"><rect width="200" height="230" fill="#4d5364"/>${piezas.map(poligonos).join("")}</svg>`;
 }
 
 export function hojaContacto() {

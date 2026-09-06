@@ -85,13 +85,21 @@ const SILUETA_ANCHO = Object.freeze({ ancha: 1.18, estrecha: 0.88, neutra: 1 });
 function volumenAvatar([ancho, alto, fondo], { radioAbajo = 0.46, radioArriba = 0.54 } = {}) {
   const radioX = ancho / 2;
   const radioZ = fondo / 2;
-  return prisma([0, -alto / 2, 0], {
-    radioAbajo: Math.min(radioX, radioZ) * radioAbajo,
-    radioArriba: Math.min(radioX, radioZ) * radioArriba,
+  const malla = prisma([0, -alto / 2, 0], {
+    radioAbajo: radioZ * radioAbajo,
+    radioArriba: radioZ * radioArriba,
     alto,
     lados: 8,
     tapaAbajo: true,
   });
+  // `prisma` usa un radio circular. El avatar, en cambio, declara ancho y
+  // fondo por separado: conservar ambos evita que la dimensión menor aplaste
+  // la silueta racial en el render.
+  const escalaX = radioZ === 0 ? 1 : radioX / radioZ;
+  return {
+    ...malla,
+    vertices: malla.vertices.map(([x, y, z]) => [x * escalaX, y, z]),
+  };
 }
 
 function piezaAvatar(nombre, color, centro, medidas, opciones) {

@@ -101,8 +101,9 @@ test("la raza rompe la silueta además de cambiar proporciones", () => {
 test("la raza cambia estatura y anchura, y nada más", () => {
   // Las piezas-hueso (brazos, piernas) no tienen `medidas` — su extensión
   // vertical hay que leerla de su propia malla, no del contrato de caja de
-  // `piezaAvatar`.
-  const altoDePieza = (p) => (p.medidas ? p.centro[1] + p.medidas[1] / 2 : Math.max(...p.malla.vertices.map((v) => v[1])));
+  // `piezaAvatar`. Su malla es relativa a `centro` (contrato fijado en
+  // #1028): hay que sumarlo para tener una Y de mundo.
+  const altoDePieza = (p) => (p.medidas ? p.centro[1] + p.medidas[1] / 2 : p.centro[1] + Math.max(...p.malla.vertices.map((v) => v[1])));
   const alto = (raza) => {
     const piezas = piezasAvatar({ raza }, { pies: [0, 0, 0] });
     return Math.max(...piezas.map(altoDePieza));
@@ -310,14 +311,16 @@ test("hay dos piernas, no una, y cada una llega al suelo", () => {
   const piernaDer = piezas.filter((p) => p.nombre.includes("PiernaDer"));
   assert.equal(piernaIzq.length, 2, "la pierna izquierda no tiene sus dos huesos");
   assert.equal(piernaDer.length, 2, "la pierna derecha no tiene sus dos huesos");
-  // El hueso más bajo de cada pierna llega hasta los pies (y=0), no se queda flotando.
+  // El hueso más bajo de cada pierna llega hasta los pies (y=0), no se queda
+  // flotando. Su malla es relativa a `centro` (contrato de #1028): hay que
+  // sumarlo para tener la Y de mundo, igual que hace el consumidor real.
   for (const pierna of [piernaIzq, piernaDer]) {
-    const yMinimo = Math.min(...pierna.flatMap((p) => p.malla.vertices.map((v) => v[1])));
+    const yMinimo = Math.min(...pierna.flatMap((p) => p.malla.vertices.map((v) => p.centro[1] + v[1])));
     assert.ok(yMinimo < 0.05, "la pierna no llega al suelo");
   }
   // Y las dos piernas están separadas: no son la misma columna central de antes.
-  const xIzq = piernaIzq[0].malla.vertices[0][0];
-  const xDer = piernaDer[0].malla.vertices[0][0];
+  const xIzq = piernaIzq[0].centro[0] + piernaIzq[0].malla.vertices[0][0];
+  const xDer = piernaDer[0].centro[0] + piernaDer[0].malla.vertices[0][0];
   assert.ok(xIzq < 0 && xDer > 0, "las piernas no están a los lados");
 });
 
@@ -331,11 +334,57 @@ test("el brazo llega exactamente a donde está la mano de cada gesto", () => {
       // El segundo anillo del segundo hueso rodea la muñeca a `radioB`: su
       // CENTROIDE, no uno de sus vértices sueltos, es el que tiene que caer
       // sobre el centro de la mano — es el mismo punto por construcción.
+      // La malla de `brazoB` es relativa a su propio `centro` (el codo,
+      // contrato fijado en #1028): hay que sumarlo para comparar en mundo,
+      // exactamente la transformación que aplica el consumidor real.
       const anilloLejano = brazoB.malla.vertices.slice(brazoB.malla.vertices.length / 2);
-      const centroide = anilloLejano.reduce((s, v) => [s[0] + v[0], s[1] + v[1], s[2] + v[2]], [0, 0, 0]).map((v) => v / anilloLejano.length);
+      const centroideLocal = anilloLejano.reduce((s, v) => [s[0] + v[0], s[1] + v[1], s[2] + v[2]], [0, 0, 0]).map((v) => v / anilloLejano.length);
+      const centroide = [centroideLocal[0] + brazoB.centro[0], centroideLocal[1] + brazoB.centro[1], centroideLocal[2] + brazoB.centro[2]];
       const dist = Math.hypot(centroide[0] - mano.centro[0], centroide[1] - mano.centro[1], centroide[2] - mano.centro[2]);
       assert.ok(dist < 1e-6, `${gesto}: el brazo ${lado} no llega a la mano (dist=${dist})`);
     }
+  }
+});
+
+// Regresión de #1028: los tres consumidores (cantina, nave, mapa) pintan
+// SIEMPRE con la misma transformación — `desplazar(pieza.malla, pieza.centro)`,
+// nunca la malla a secas. Un test que compruebe la malla sin pasarla por ahí
+// no habría cazado el desplazamiento doble que separaba brazo y cuerpo: hay
+// que componer literalmente como pinta el consumidor real, no solo sumar
+// `centro` a mano en el test.
+function desplazar(malla, [dx, dy, dz]) {
+  return { ...malla, vertices: malla.vertices.map(([x, y, z]) => [x + dx, y + dy, z + dz]) };
+}
+
+test("tras la transformación real del consumidor, brazo y pierna quedan pegados al cuerpo, no flotando", () => {
+  const piezas = piezasAvatar({ raza: "humano", gesto: "quieto" }, { pies: [0, 0, 0] });
+  const enMundo = (pieza) => desplazar(pieza.malla, pieza.centro);
+
+  // Piernas: el hueso más bajo, ya transformado, debe llegar al suelo.
+  for (const lado of ["Izq", "Der"]) {
+    const huesos = piezas.filter((p) => p.nombre.includes(`Pierna${lado}`));
+    assert.equal(huesos.length, 2, `falta un hueso de la pierna ${lado}`);
+    const yMinimo = Math.min(...huesos.flatMap((p) => enMundo(p).vertices.map((v) => v[1])));
+    assert.ok(yMinimo < 0.05, `pierna ${lado}: no llega al suelo tras desplazar(malla, centro)`);
+  }
+
+  // Brazos: el primer tramo (A, del hombro al codo) y el segundo (B, del
+  // codo a la mano) tienen que empalmar en mundo — el anillo lejano de A y
+  // el anillo cercano de B caen en el mismo sitio, que es "el codo" para
+  // los dos. Antes de la corrección los dos tramos usaban `centro: origen`
+  // y la malla ya iba en mundo: sumarle `centro` otra vez separaba el
+  // segundo tramo del primero en vez de empalmarlos.
+  for (const lado of ["Izq", "Der"]) {
+    const brazoA = piezas.find((p) => p.nombre === `avatar0Brazo${lado}A`);
+    const brazoB = piezas.find((p) => p.nombre === `avatar0Brazo${lado}B`);
+    assert.ok(brazoA && brazoB, `falta un tramo del brazo ${lado}`);
+    const anilloLejanoA = enMundo(brazoA).vertices.slice(brazoA.malla.vertices.length / 2);
+    const anilloCercanoB = enMundo(brazoB).vertices.slice(0, brazoB.malla.vertices.length / 2);
+    const centroide = (puntos) => puntos.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]).map((v) => v / puntos.length);
+    const codoA = centroide(anilloLejanoA);
+    const codoB = centroide(anilloCercanoB);
+    const dist = Math.hypot(codoA[0] - codoB[0], codoA[1] - codoB[1], codoA[2] - codoB[2]);
+    assert.ok(dist < 1e-6, `brazo ${lado}: el codo no empalma entre el tramo A y el B tras desplazar(malla, centro) (dist=${dist})`);
   }
 });
 

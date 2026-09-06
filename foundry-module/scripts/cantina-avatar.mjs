@@ -126,6 +126,16 @@ function piezaAvatar(nombre, color, centro, medidas, opciones) {
  * flotando y pasan a ser HUESOS que conectan un punto con otro de verdad,
  * que es lo que hacía que antes parecieran cuerdas — sin masa de hombro, sin
  * grosor que cambie, sin ángulo real en el codo.
+ *
+ * CONTRATO DE COORDENADAS: igual que `volumenAvatar` (relativa a `[0, 0, 0]`,
+ * y es quien la usa —el consumidor— quien la desplaza por `pieza.centro`), la
+ * malla que devuelve esto es relativa a `a`, no a coordenadas de mundo. La
+ * revisión de #1028 lo reprodujo con números: antes esta función anclaba los
+ * dos anillos en `a` y `b` ya en mundo, y los tres consumidores volvían a
+ * sumarles `pieza.centro` — un doble desplazamiento que separaba el brazo del
+ * cuerpo. `a` cae siempre en el origen local (`[0,0,0]`); `b` es el vector
+ * `b - a`. Quien llama tiene que poner `centro: a`, no el origen del miembro
+ * entero (ver `miembro`, donde el segundo hueso usa `centro: codo`).
  */
 function hueso(a, b, { radioA = 0.06, radioB = 0.05, lados = 6 } = {}) {
   const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
@@ -153,7 +163,7 @@ function hueso(a, b, { radioA = 0.06, radioB = 0.05, lados = 6 } = {}) {
     return puntos;
   };
 
-  const vertices = [...anillo(a, radioA), ...anillo(b, radioB)];
+  const vertices = [...anillo([0, 0, 0], radioA), ...anillo([dx, dy, dz], radioB)];
   const caras = [];
   for (let i = 0; i < lados; i += 1) {
     const j = (i + 1) % lados;
@@ -198,12 +208,17 @@ function articulacion(origen, objetivo, largoA, largoB, hacia = [0, 0, 1]) {
 }
 
 /** Un miembro de dos huesos —brazo o pierna— entre `origen` y `objetivo`,
- *  como dos piezas ya listas para el pintor. */
+ *  como dos piezas ya listas para el pintor. Cada tramo lleva su PROPIO
+ *  extremo de partida como `centro` —`origen` para el primero, `codo` para
+ *  el segundo—, porque la malla de `hueso()` es relativa a ese extremo y no
+ *  a coordenadas de mundo (ver la cabecera de `hueso`): darle a los dos
+ *  tramos el mismo `centro: origen` es justo el desplazamiento doble que la
+ *  revisión de #1028 encontró. */
 function miembro(nombre, color, origen, objetivo, largoA, largoB, { radioA, radioMedio, radioB, hacia }) {
   const codo = articulacion(origen, objetivo, largoA, largoB, hacia);
   return [
     { nombre: `${nombre}A`, color, centro: origen, medidas: null, malla: hueso(origen, codo, { radioA, radioB: radioMedio }) },
-    { nombre: `${nombre}B`, color, centro: origen, medidas: null, malla: hueso(codo, objetivo, { radioA: radioMedio, radioB }) },
+    { nombre: `${nombre}B`, color, centro: codo, medidas: null, malla: hueso(codo, objetivo, { radioA: radioMedio, radioB }) },
   ];
 }
 

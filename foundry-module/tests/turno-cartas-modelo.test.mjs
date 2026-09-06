@@ -42,3 +42,18 @@ test("el boceto SVG cambia por raza, clase y shiny sin usar binarios", () => {
   assert.doesNotMatch(normal, /stroke-dasharray/);
   assert.match(shiny, /stroke-dasharray/);
 });
+
+test("expone badges de concentración, inspiración y agotamiento acotado", () => {
+  const carta = normalizarTarjeta({ concentracion: true, inspiracion: true, agotamiento: 9 });
+  assert.deepEqual(carta.badges, ["concentracion", "inspiracion", "agotamiento"]);
+  assert.deepEqual(carta.visual.iconoBadges, ["foco", "chispa", "fatiga"]);
+  assert.equal(carta.agotamiento, 6);
+  assert.match(tarjetaSvg(carta), /E6\/6/);
+});
+
+test("el agotamiento cero no crea badge ni altera shiny", () => {
+  const carta = normalizarTarjeta({ shiny: true, agotamiento: 0 });
+  assert.deepEqual(carta.badges, []);
+  assert.equal(carta.shiny, true);
+  assert.doesNotMatch(tarjetaSvg(carta), /E0\/6/);
+});

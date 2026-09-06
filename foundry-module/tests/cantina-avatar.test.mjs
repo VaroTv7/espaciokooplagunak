@@ -10,16 +10,21 @@ import test from "node:test";
 
 import {
   ALTO_BASE,
+  ANADIDOS_PELO,
   CLASES,
+  CORTES_PELO,
+  FLEQUILLOS,
   GESTOS,
   RAZAS,
   SILUETAS,
   SITIOS,
+  VELLOS,
   anclasHumoDeLaGente,
   intensidadCalada,
   normalizarAvatar,
   piezasAvatar,
   piezasDeLaGente,
+  avatarDesdeTexto,
 } from "../scripts/cantina-avatar.mjs";
 
 test("las doce clases del SRD 5.1 están, y solo esas", () => {
@@ -61,10 +66,47 @@ test("la proporción es la del estilo: cabeza enorme, no figura realista", () =>
   assert.ok(cabeza.medidas[1] / ALTO_BASE > 0.2, "la cabeza es demasiado pequeña para el estilo");
 });
 
+test("la gramática PSX usa volúmenes estrechados, en octógono o en hueso", () => {
+  // No todo es ya un único prisma vertical de dos anillos de ocho: brazos y
+  // piernas son HUESOS (`hueso()`) entre dos puntos cualesquiera, con menos
+  // lados y su propio par de anillos. La regla que importa —"ningún volumen
+  // tiene lados paralelos", la que de verdad distingue un tronco de pirámide
+  // de una caja— vale para las dos formas por igual, así que se comprueba de
+  // forma genérica: dos anillos completos, cerrados, con radio distinto.
+  const centroide = (puntos) => puntos.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]).map((v) => v / puntos.length);
+  const radioMedio = (puntos, centro) => puntos.reduce((s, p) => s + Math.hypot(p[0] - centro[0], p[2] - centro[2]), 0) / puntos.length;
+
+  const piezas = piezasAvatar({ raza: "humano", clase: "guerrero" }, { pies: [0, 0, 0] });
+  for (const pieza of piezas) {
+    assert.ok(pieza.malla, `${pieza.nombre} no tiene malla propia`);
+    const n = pieza.malla.vertices.length;
+    assert.ok(n % 2 === 0 && n >= 8, `${pieza.nombre} no son dos anillos completos de al menos cuatro lados`);
+    assert.ok(pieza.malla.caras.length >= n / 2, `${pieza.nombre} no está cerrado`);
+    const mitad = n / 2;
+    const anilloA = pieza.malla.vertices.slice(0, mitad);
+    const anilloB = pieza.malla.vertices.slice(mitad);
+    const radioA = radioMedio(anilloA, centroide(anilloA));
+    const radioB = radioMedio(anilloB, centroide(anilloB));
+    assert.notEqual(radioA.toFixed(4), radioB.toFixed(4), `${pieza.nombre} conserva lados paralelos`);
+  }
+});
+
+test("la raza rompe la silueta además de cambiar proporciones", () => {
+  const nombres = (raza) => piezasAvatar({ raza }, { pies: [0, 0, 0] }).map((pieza) => pieza.nombre);
+  assert.ok(nombres("enano").some((nombre) => nombre.endsWith("Barba")));
+  assert.ok(nombres("elfo").some((nombre) => nombre.endsWith("OrejaIzq")));
+  assert.ok(nombres("mediano").some((nombre) => nombre.endsWith("CabezaGrande")));
+});
+
 test("la raza cambia estatura y anchura, y nada más", () => {
+  // Las piezas-hueso (brazos, piernas) no tienen `medidas` — su extensión
+  // vertical hay que leerla de su propia malla, no del contrato de caja de
+  // `piezaAvatar`. Su malla es relativa a `centro` (contrato fijado en
+  // #1028): hay que sumarlo para tener una Y de mundo.
+  const altoDePieza = (p) => (p.medidas ? p.centro[1] + p.medidas[1] / 2 : p.centro[1] + Math.max(...p.malla.vertices.map((v) => v[1])));
   const alto = (raza) => {
     const piezas = piezasAvatar({ raza }, { pies: [0, 0, 0] });
-    return Math.max(...piezas.map((p) => p.centro[1] + p.medidas[1] / 2));
+    return Math.max(...piezas.map(altoDePieza));
   };
   assert.ok(alto("mediano") < alto("humano"), "el mediano no es más bajo");
   assert.ok(alto("elfo") > alto("humano"), "el elfo no es más alto");
@@ -181,12 +223,212 @@ test("un gesto que no existe deja a la persona quieta, no rota", () => {
   assert.deepEqual(raro, quieto);
 });
 
-test("no hay gestos de cara, y es a propósito", () => {
-  // Estos avatares no tienen ojos ni boca: es lo que los hace legibles a esta
-  // resolución. Si algún día se añade un guiño, hará falta darles cara primero,
-  // y eso es una decisión de estilo — no un gesto más.
+test("la cara es la misma para cualquier gesto — el gesto vive en las manos", () => {
+  // Antes esto comprobaba que NO había cara (#423): sin ojos ni boca, por
+  // legibilidad a esta resolución. "Rostro sin ser Minecraft" (#973) decidió
+  // lo contrario — geometría real de cuenca+pupila, sombreada por la luz de la
+  // escena en vez de un píxel fijo — así que la invariante que queda es la que
+  // sigue importando: el REPERTORIO de gestos (`GESTOS`) sigue viviendo en las
+  // manos, no en la cara. Un "brindis" no debería fruncir un ceño que un
+  // "quieto" no frunce; eso sería un gesto de cara colándose por la puerta de
+  // atrás.
+  const caraDe = (piezas) => piezas.filter((p) => /Cuenca|Pupila|Ceja/.test(p.nombre));
+  const referencia = caraDe(piezasAvatar({ gesto: "quieto" }, { pies: [0, 0, 0] }));
+  for (const gesto of GESTOS) {
+    const cara = caraDe(piezasAvatar({ gesto }, { pies: [0, 0, 0] }));
+    assert.deepEqual(cara, referencia, `${gesto} ha cambiado la cara`);
+  }
+});
+
+test("avatarDesdeTexto lee raza, clase y gesto en cualquier orden", () => {
+  assert.deepEqual(avatarDesdeTexto("enano,mago,brindis"), { raza: "enano", clase: "mago", gesto: "brindis" });
+  // El orden no importa: cada trozo se reconoce por a qué catálogo pertenece.
+  assert.deepEqual(avatarDesdeTexto("brindis, MAGO ,enano"), { raza: "enano", clase: "mago", gesto: "brindis" });
+});
+
+test("avatarDesdeTexto ignora lo que no reconoce en vez de reventar", () => {
+  // Lee de una URL escrita a mano: una errata tiene que degradar al avatar
+  // genérico, no tirar la escena entera.
+  assert.deepEqual(avatarDesdeTexto("dragonborn,ninja"), {});
+  assert.deepEqual(avatarDesdeTexto(""), {});
+  assert.deepEqual(avatarDesdeTexto(null), {});
+  assert.deepEqual(avatarDesdeTexto(undefined), {});
+});
+
+test("avatarDesdeTexto toma un número suelto como color de ropa", () => {
+  assert.deepEqual(avatarDesdeTexto("elfo,3"), { raza: "elfo", ropa: 3 });
+});
+
+test("lo que sale de avatarDesdeTexto lo entiende normalizarAvatar", () => {
+  // La pareja tiene que cerrar: si el parseador emitiera una clave que el
+  // normalizador no conoce, el avatar saldría por defecto sin que nadie avise.
+  const av = normalizarAvatar(avatarDesdeTexto("mediano,picaro,fumar"));
+  assert.equal(av.raza, "mediano");
+  assert.equal(av.clase, "picaro");
+  assert.equal(av.gesto, "fumar");
+});
+
+test("cada clase rompe el contorno con una malla válida, o deliberadamente ninguna", () => {
+  // El monje es el único caso "sin silueta", y es a propósito (ver la cabecera
+  // de piezasSiluetaClase): su distintivo es no llevar nada encima.
+  const SIN_SILUETA = new Set(["monje"]);
+  for (const clase of CLASES) {
+    const piezas = piezasAvatar({ raza: "humano", clase }, { pies: [0, 0, 0] });
+    // Las piezas de silueta llevan el nombre "Capa"/"Tunica"/"Capucha"/etc.
+    // pegado al prefijo del avatar; basta con que exista alguna para saber que
+    // se coló la pieza y no solo el arma al hombro de distintivoDeClase.
+    const deSilueta = piezas.filter((p) =>
+      /Hombrera|Capa|Tunica|Capucha|Sombrero|Ala|Aureola/.test(p.nombre),
+    );
+    if (SIN_SILUETA.has(clase)) {
+      assert.equal(deSilueta.length, 0, `${clase} no debería llevar pieza de silueta`);
+      continue;
+    }
+    assert.ok(deSilueta.length > 0, `${clase} no rompe el contorno`);
+    for (const pieza of deSilueta) {
+      assert.ok(Array.isArray(pieza.malla?.vertices) && pieza.malla.vertices.length >= 4, `${clase}: malla sin vértices`);
+      assert.ok(Array.isArray(pieza.malla?.caras) && pieza.malla.caras.length > 0, `${clase}: malla sin caras`);
+      for (const v of pieza.malla.vertices) {
+        assert.ok(v.every(Number.isFinite), `${clase}: vértice no finito en ${pieza.nombre}`);
+      }
+    }
+  }
+});
+
+test("la silueta de clase se compone igual con cualquier raza", () => {
+  // La raza decide la proporción, la clase el contorno: son capas
+  // independientes, y una no debe reventar a la otra.
+  for (const raza of RAZAS) {
+    const piezas = piezasAvatar({ raza, clase: "mago" }, { pies: [0, 0, 0] });
+    const sombrero = piezas.find((p) => p.nombre.includes("Sombrero"));
+    assert.ok(sombrero, `mago-${raza}: falta el sombrero cónico`);
+  }
+});
+
+test("hay dos piernas, no una, y cada una llega al suelo", () => {
+  const piezas = piezasAvatar({ raza: "humano" }, { pies: [0, 0, 0] });
+  const piernaIzq = piezas.filter((p) => p.nombre.includes("PiernaIzq"));
+  const piernaDer = piezas.filter((p) => p.nombre.includes("PiernaDer"));
+  assert.equal(piernaIzq.length, 2, "la pierna izquierda no tiene sus dos huesos");
+  assert.equal(piernaDer.length, 2, "la pierna derecha no tiene sus dos huesos");
+  // El hueso más bajo de cada pierna llega hasta los pies (y=0), no se queda
+  // flotando. Su malla es relativa a `centro` (contrato de #1028): hay que
+  // sumarlo para tener la Y de mundo, igual que hace el consumidor real.
+  for (const pierna of [piernaIzq, piernaDer]) {
+    const yMinimo = Math.min(...pierna.flatMap((p) => p.malla.vertices.map((v) => p.centro[1] + v[1])));
+    assert.ok(yMinimo < 0.05, "la pierna no llega al suelo");
+  }
+  // Y las dos piernas están separadas: no son la misma columna central de antes.
+  const xIzq = piernaIzq[0].centro[0] + piernaIzq[0].malla.vertices[0][0];
+  const xDer = piernaDer[0].centro[0] + piernaDer[0].malla.vertices[0][0];
+  assert.ok(xIzq < 0 && xDer > 0, "las piernas no están a los lados");
+});
+
+test("el brazo llega exactamente a donde está la mano de cada gesto", () => {
   for (const gesto of GESTOS) {
     const piezas = piezasAvatar({ gesto }, { pies: [0, 0, 0] });
-    assert.ok(!piezas.some((p) => /Ojo|Boca|Ceja/.test(p.nombre)), `${gesto} ha inventado una cara`);
+    for (const lado of ["Izq", "Der"]) {
+      const mano = piezas.find((p) => p.nombre === `avatar0Mano${lado}`);
+      const brazoB = piezas.find((p) => p.nombre === `avatar0Brazo${lado}B`);
+      assert.ok(mano && brazoB, `${gesto}: falta la mano o el antebrazo ${lado}`);
+      // El segundo anillo del segundo hueso rodea la muñeca a `radioB`: su
+      // CENTROIDE, no uno de sus vértices sueltos, es el que tiene que caer
+      // sobre el centro de la mano — es el mismo punto por construcción.
+      // La malla de `brazoB` es relativa a su propio `centro` (el codo,
+      // contrato fijado en #1028): hay que sumarlo para comparar en mundo,
+      // exactamente la transformación que aplica el consumidor real.
+      const anilloLejano = brazoB.malla.vertices.slice(brazoB.malla.vertices.length / 2);
+      const centroideLocal = anilloLejano.reduce((s, v) => [s[0] + v[0], s[1] + v[1], s[2] + v[2]], [0, 0, 0]).map((v) => v / anilloLejano.length);
+      const centroide = [centroideLocal[0] + brazoB.centro[0], centroideLocal[1] + brazoB.centro[1], centroideLocal[2] + brazoB.centro[2]];
+      const dist = Math.hypot(centroide[0] - mano.centro[0], centroide[1] - mano.centro[1], centroide[2] - mano.centro[2]);
+      assert.ok(dist < 1e-6, `${gesto}: el brazo ${lado} no llega a la mano (dist=${dist})`);
+    }
   }
+});
+
+// Regresión de #1028: los tres consumidores (cantina, nave, mapa) pintan
+// SIEMPRE con la misma transformación — `desplazar(pieza.malla, pieza.centro)`,
+// nunca la malla a secas. Un test que compruebe la malla sin pasarla por ahí
+// no habría cazado el desplazamiento doble que separaba brazo y cuerpo: hay
+// que componer literalmente como pinta el consumidor real, no solo sumar
+// `centro` a mano en el test.
+function desplazar(malla, [dx, dy, dz]) {
+  return { ...malla, vertices: malla.vertices.map(([x, y, z]) => [x + dx, y + dy, z + dz]) };
+}
+
+test("tras la transformación real del consumidor, brazo y pierna quedan pegados al cuerpo, no flotando", () => {
+  const piezas = piezasAvatar({ raza: "humano", gesto: "quieto" }, { pies: [0, 0, 0] });
+  const enMundo = (pieza) => desplazar(pieza.malla, pieza.centro);
+
+  // Piernas: el hueso más bajo, ya transformado, debe llegar al suelo.
+  for (const lado of ["Izq", "Der"]) {
+    const huesos = piezas.filter((p) => p.nombre.includes(`Pierna${lado}`));
+    assert.equal(huesos.length, 2, `falta un hueso de la pierna ${lado}`);
+    const yMinimo = Math.min(...huesos.flatMap((p) => enMundo(p).vertices.map((v) => v[1])));
+    assert.ok(yMinimo < 0.05, `pierna ${lado}: no llega al suelo tras desplazar(malla, centro)`);
+  }
+
+  // Brazos: el primer tramo (A, del hombro al codo) y el segundo (B, del
+  // codo a la mano) tienen que empalmar en mundo — el anillo lejano de A y
+  // el anillo cercano de B caen en el mismo sitio, que es "el codo" para
+  // los dos. Antes de la corrección los dos tramos usaban `centro: origen`
+  // y la malla ya iba en mundo: sumarle `centro` otra vez separaba el
+  // segundo tramo del primero en vez de empalmarlos.
+  for (const lado of ["Izq", "Der"]) {
+    const brazoA = piezas.find((p) => p.nombre === `avatar0Brazo${lado}A`);
+    const brazoB = piezas.find((p) => p.nombre === `avatar0Brazo${lado}B`);
+    assert.ok(brazoA && brazoB, `falta un tramo del brazo ${lado}`);
+    const anilloLejanoA = enMundo(brazoA).vertices.slice(brazoA.malla.vertices.length / 2);
+    const anilloCercanoB = enMundo(brazoB).vertices.slice(0, brazoB.malla.vertices.length / 2);
+    const centroide = (puntos) => puntos.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]).map((v) => v / puntos.length);
+    const codoA = centroide(anilloLejanoA);
+    const codoB = centroide(anilloCercanoB);
+    const dist = Math.hypot(codoA[0] - codoB[0], codoA[1] - codoB[1], codoA[2] - codoB[2]);
+    assert.ok(dist < 1e-6, `brazo ${lado}: el codo no empalma entre el tramo A y el B tras desplazar(malla, centro) (dist=${dist})`);
+  }
+});
+
+test("el peinado combinable: toda combinación de corte/flequillo/añadido/vello da malla válida", () => {
+  // De "Caras y Peinados PSX" sección 03: casquete + flequillo + añadido, más
+  // el vello aparte. Cuatro ejes independientes, no doce peinados sueltos —
+  // lo que hay que probar es que NINGUNA combinación revienta ni deja un
+  // vértice no finito, no una lista de casos concretos.
+  let combinaciones = 0;
+  for (const corte of CORTES_PELO) {
+    for (const flequillo of FLEQUILLOS) {
+      for (const anadido of ANADIDOS_PELO) {
+        for (const vello of VELLOS) {
+          const piezas = piezasAvatar({ corte, flequillo, anadido, vello }, { pies: [0, 0, 0] });
+          for (const pieza of piezas) {
+            for (const v of pieza.malla.vertices) {
+              assert.ok(v.every(Number.isFinite), `corte=${corte} flequillo=${flequillo} anadido=${anadido} vello=${vello}: vértice no finito en ${pieza.nombre}`);
+            }
+          }
+          combinaciones += 1;
+        }
+      }
+    }
+  }
+  assert.equal(combinaciones, CORTES_PELO.length * FLEQUILLOS.length * ANADIDOS_PELO.length * VELLOS.length);
+});
+
+test("\"calvo\" no pone ni casquete ni flequillo ni añadido, pero el vello sigue disponible", () => {
+  const piezas = piezasAvatar({ corte: "calvo", flequillo: "recto", anadido: "coleta", vello: "largo" }, { pies: [0, 0, 0] });
+  assert.ok(!piezas.some((p) => /Casquete|Flequillo|Coleta|Mono|Melena|Cresta/.test(p.nombre)), "calvo no debería llevar pelo de ningún tipo");
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Vello")), "el vello facial no depende del peinado");
+});
+
+test("el vello facial no choca de nombre con la barba de raza del enano", () => {
+  const piezas = piezasAvatar({ raza: "enano", vello: "largo" }, { pies: [0, 0, 0] });
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Barba")), "falta el rasgo racial del enano");
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Vello")), "falta el vello elegido");
+});
+
+test("avatarDesdeTexto reconoce los ejes del peinado combinable", () => {
+  const av = avatarDesdeTexto("guerrero,largo,lateral,coleta,corto");
+  // "corto" es ambiguo entre corte y vello por diseño (dos catálogos
+  // distintos usan la misma palabra) — lo que importa es que el resto de
+  // ejes, sin ambigüedad, se lean bien.
+  assert.equal(av.flequillo, "lateral");
+  assert.equal(av.anadido, "coleta");
 });

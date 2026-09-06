@@ -46,7 +46,7 @@ const raiz = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
  * El pasillo de los recuerdos es la misma excepción por la misma razón: no
  * cuelga de ningún mamparo del Phobos y se entra por herramienta.
  */
-const FUERA_DE_LA_NAVE = new Set(["playa", "museo", "pasillo-recuerdos"]);
+const FUERA_DE_LA_NAVE = new Set(["playa", "museo", "pasillo-recuerdos", "arena"]);
 
 function todasLasEstancias() {
   const pares = CATALOGO_ANDAR.ids

@@ -102,3 +102,23 @@ test("el yaw de la cámara se traslada a la proyección de los avatares, igual q
   assert.ok(sinGirar.length > 0);
   assert.deepEqual(girado180, []);
 });
+
+test("el cuerpo gira con el yaw del propio jugador", () => {
+  // Girado 90°, el jugador debería proyectar una silueta distinta a la de
+  // frente: si el yaw se sigue tirando, las dos escenas saldrían idénticas.
+  const base = { x: 0, y: 0, z: 3, avatar: { raza: "humano", clase: "guerrero" }, yaw: 0 };
+  const girado = { ...base, yaw: Math.PI / 2 };
+  const anchoDe = (poligonos) => {
+    const xs = poligonos.flatMap((p) => p.puntos.map((pt) => pt.x));
+    return Math.max(...xs) - Math.min(...xs);
+  };
+  const sinGirar = poligonosOtrosJugadores([base], OPCIONES_BASE);
+  const conGiro = poligonosOtrosJugadores([girado], OPCIONES_BASE);
+  assert.notEqual(anchoDe(sinGirar).toFixed(3), anchoDe(conGiro).toFixed(3), "girar 90° no cambió la silueta proyectada");
+});
+
+test("sin yaw (o yaw a cero) el resultado no cambia — compatible con quien no lo declare", () => {
+  const sinYaw = poligonosOtrosJugadores([{ x: 0, y: 0, z: 3, avatar: {} }], OPCIONES_BASE);
+  const yawCero = poligonosOtrosJugadores([{ x: 0, y: 0, z: 3, yaw: 0, avatar: {} }], OPCIONES_BASE);
+  assert.deepEqual(sinYaw, yawCero);
+});

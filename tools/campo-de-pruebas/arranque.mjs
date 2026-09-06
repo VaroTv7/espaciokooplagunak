@@ -32,6 +32,11 @@ import { CATALOGO_MUSEO } from "../../foundry-module/scripts/museo-piezas.mjs";
 import { CATALOGO_CUADROS } from "../../foundry-module/scripts/museo-cuadros.mjs";
 import { cartelaDe } from "../../foundry-module/scripts/catalogo-piezas.mjs";
 import { estanciaDe, nivelDe, NIVELES, siguienteNivel } from "./niveles.mjs";
+// El avatar con el que se anda, desde la URL: `?avatar=enano,mago,brindis`.
+// Sin esto el campo enseñaba SIEMPRE el humano guerrero genérico —el sistema
+// entero estaba ahí y el escaparate lo enseñaba apagado, que es la peor forma
+// de tener algo: parece que no está.
+import { avatarDesdeTexto } from "../../foundry-module/scripts/cantina-avatar.mjs";
 
 /**
  * Las cartelas, indexadas por ID de pieza. Los dos catálogos del museo en el
@@ -91,7 +96,7 @@ function arranque(estancia, mirador) {
   return { x: punto.punto[0], z: punto.punto[1], yaw: punto.orientacion ?? 0 };
 }
 
-export async function arrancarCampo({ lienzo, panel, rotulo, idioma = "es", nivel: pedido, mirador = null }) {
+export async function arrancarCampo({ lienzo, panel, rotulo, idioma = "es", nivel: pedido, mirador = null, avatar = null }) {
   const textos = await cargarIdioma(idioma);
   const fichas = cartelas(idioma);
   const lengua = idioma === "en" ? "en" : "es";
@@ -157,7 +162,12 @@ export async function arrancarCampo({ lienzo, panel, rotulo, idioma = "es", nive
 
   let salidaAlAlcance = null;
 
+  // El avatar propio: se ve en tercera persona (`V`) y es lo que enseña que el
+  // muñeco tiene variantes de verdad.
+  const descripcionAvatar = avatarDesdeTexto(avatar);
+
   const mando = arrancarAndar(lienzo, {
+    avatarPropio: () => descripcionAvatar,
     planta: estancia.planta,
     componer: estancia.componer,
     puertas: estancia.puertas ?? [],

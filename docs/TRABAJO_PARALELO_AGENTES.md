@@ -42,6 +42,7 @@ PR: cada área se verifica sola, y por eso se pueden entregar por separado.
 | Módulo: minijuegos | `foundry-module/scripts/minijuegos/**`, `foundry-module/scripts/minijuegos-wiring.mjs` | `node --test $(find foundry-module/tests -name '*.test.mjs')` |
 | Módulo: catálogos con procedencia | `foundry-module/scripts/catalogo-*.mjs`, `foundry-module/scripts/procedencia-*.mjs`, `foundry-module/scripts/museo-piezas.mjs`, `foundry-module/scripts/museo-cuadros.mjs`, `foundry-module/scripts/atlas-hyg.mjs`, `foundry-module/data/**` | `node --test $(find foundry-module/tests -name '*.test.mjs')` |
 | Módulo: contenido externo del GM | `foundry-module/scripts/contenido-externo/**` | `node --test $(find foundry-module/tests -name '*.test.mjs')` |
+| Módulo: arena de combate | `foundry-module/scripts/arena-combate-escena.mjs`, `foundry-module/scripts/combate-rejilla.mjs`, `foundry-module/scripts/pathfinding-core.mjs`, `foundry-module/scripts/pasillo-guardiana.mjs`, `foundry-module/scripts/pasillo-recuerdos-*.mjs` | `node --test $(find foundry-module/tests -name '*.test.mjs')` |
 | Documentación | `docs/**`, `README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md` | — (revisión humana) |
 
 <!-- /MAPA_AREAS -->

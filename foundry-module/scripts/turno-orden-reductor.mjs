@@ -4,7 +4,7 @@
  *
  * State shape:
  *   {
- *     combatants: Array<{id:string, name:string, initiative:number, initiativeMod:number, ally:boolean}>,
+ *     combatants: Array<{id:string, name:string, initiative:number, initiativeMod:number, ally:boolean, race?:string, className?:string, shiny?:boolean, statuses?:string[], exhaustion?:number}>,
  *     currentIndex: number,
  *     round: number,
  *     active: boolean
@@ -12,7 +12,7 @@
  *
  * Actions:
  *   {type: 'INIT'} - start fresh state
- *   {type: 'ADD_COMBATANT', payload: {id, name, initiativeMod, ally}}
+ *   {type: 'ADD_COMBATANT', payload: {id, name, initiativeMod, ally, race, className, shiny, statuses, exhaustion}}
  *   {type: 'REMOVE_COMBATANT', payload: {id}}
  *   {type: 'SET_INITIATIVE', payload: {id, initiative}} // sets raw initiative (after roll)
  *   {type: 'ROLL_INITIATIVE', payload: {id, roll}} // adds roll to initiativeMod
@@ -28,6 +28,25 @@ export const TURN_ORDER_ERRORES = Object.freeze({
   COMBATANT_NOT_FOUND: 'combatant-not-found',
   COMBAT_NOT_ACTIVE: 'combat-not-active',
 });
+
+const ESTADOS_VALIDOS = Object.freeze(['herido', 'ventaja', 'concentracion', 'muerto']);
+
+function metadatosDeCombatiente(payload = {}) {
+  const estados = Array.isArray(payload.statuses)
+    ? [...new Set(payload.statuses.filter((estado) => ESTADOS_VALIDOS.includes(estado)))]
+    : [];
+  const agotamiento = Number.isInteger(payload.exhaustion)
+    ? Math.max(0, Math.min(6, payload.exhaustion))
+    : 0;
+  return {
+    race: typeof payload.race === 'string' ? payload.race : null,
+    className: typeof payload.className === 'string' ? payload.className : null,
+    shiny: payload.shiny === true,
+    statuses: Object.freeze(estados),
+    inspiration: payload.inspiration === true,
+    exhaustion: agotamiento,
+  };
+}
 
 /** Initial state: empty, not active, round 0. */
 export function crearEstado() {
@@ -73,6 +92,7 @@ export function reducir(state, action) {
         initiative: initiativeMod, // base initiative starts as modifier (will be rolled later)
         initiativeMod,
         ally,
+        ...metadatosDeCombatiente(action.payload),
       });
       const updated = [...frozen.combatants, nuevo];
       const sorted = ordenarPorIniciativa(updated);
@@ -152,6 +172,15 @@ export function reducir(state, action) {
         combatants: Object.freeze(sorted),
         currentIndex: adjustedIndex,
       });
+    }
+
+    case 'SET_COMBATANT_STATUS': {
+      const { id, ...status } = action.payload;
+      const idx = indicePorId(frozen.combatants, id);
+      if (idx < 0) return frozen;
+      const updated = [...frozen.combatants];
+      updated[idx] = Object.freeze({ ...updated[idx], ...metadatosDeCombatiente({ ...updated[idx], ...status }) });
+      return Object.freeze({ ...frozen, combatants: Object.freeze(updated) });
     }
 
     case 'ROLL_INITIATIVE': {

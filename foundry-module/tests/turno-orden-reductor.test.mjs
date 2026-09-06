@@ -14,7 +14,7 @@ export function testTurnOrderReducer() {
   // Test ADD_COMBATANT
   state = reducir(state, {
     type: 'ADD_COMBATANT',
-    payload: { id: '1', name: 'Goblin', initiativeMod: 2, ally: false },
+    payload: { id: '1', name: 'Goblin', initiativeMod: 2, ally: false, race: 'elfo', className: 'mago', shiny: true },
   });
   assert.equal(state.combatants.length, 1);
   assert.equal(state.combatants[0].id, '1');
@@ -22,6 +22,9 @@ export function testTurnOrderReducer() {
   assert.equal(state.currentIndex, 0);
   assert.equal(state.round, 0);
   assert.equal(state.active, false);
+  assert.equal(state.combatants[0].race, 'elfo');
+  assert.equal(state.combatants[0].className, 'mago');
+  assert.equal(state.combatants[0].shiny, true);
 
   // Add another with higher initiative
   state = reducir(state, {
@@ -112,6 +115,18 @@ export function testTurnOrderReducer() {
   // Test RESET
   state = reducir(state, { type: 'RESET' });
   assert.deepStrictEqual(state, crearEstado());
+
+  state = reducir(crearEstado(), {
+    type: 'ADD_COMBATANT',
+    payload: { id: 'status', name: 'Alda', initiativeMod: 4, ally: true },
+  });
+  state = reducir(state, {
+    type: 'SET_COMBATANT_STATUS',
+    payload: { id: 'status', statuses: ['concentracion', 'invalido', 'concentracion'], inspiration: true, exhaustion: 9 },
+  });
+  assert.deepStrictEqual(state.combatants[0].statuses, ['concentracion']);
+  assert.equal(state.combatants[0].inspiration, true);
+  assert.equal(state.combatants[0].exhaustion, 6);
 
   console.log('All tests passed');
 }

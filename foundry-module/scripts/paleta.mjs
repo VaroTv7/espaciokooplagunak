@@ -243,6 +243,15 @@ export const AVATAR = Object.freeze({
   acero: "#9aa5b1", // armas y armaduras
   madera: "#7a5230", // báculos, laúdes
   simbolo: "#e8d9a0", // el símbolo sagrado del clérigo
+  // Silueta de clase (#1013 sobre la "Gramática PSX del Avatar"): lo que rompe
+  // el contorno además del arma al hombro — capucha, capa, túnica, hombrera.
+  // Colores de MATERIAL y no de facción: una capucha de pícaro es del mismo
+  // cuero lleve quien la lleve la ropa que lleve.
+  tunica: "#5b4a7a", // paño de mago/hechicero/brujo
+  tunicaOscura: "#3b2f52", // la misma tela, en la variante de brujo
+  capa: "#7a2f3a", // capa de paladín/bardo
+  cuero: "#6b5136", // capucha y correaje de pícaro/explorador
+  natural: "#5c7a4a", // hombreras de follaje de la druida
   // Lo que se lleva en la mano según el gesto.
   jarra: "#e0a33a", // el mismo ámbar de la cerveza de la barra
   cigarro: "#e8e4d8",

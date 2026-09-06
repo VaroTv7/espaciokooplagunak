@@ -195,6 +195,14 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
     ...manosDelGesto(av.gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel, prefijo, indice, tiempo }),
     // Y lo que lleva encima, que es lo que dice la clase de un vistazo.
     ...distintivoDeClase(av.clase, { px, py: yTorso, pz, ancho, altoTorso, prefijo }),
+    // Y lo que cambia el CONTORNO: capucha, capa, túnica — ver la cabecera de
+    // `piezasSiluetaClase`.
+    ...piezasSiluetaClase(av.clase, {
+      px, pz, ancho, prefijo,
+      yHombro: yTorso + altoTorso / 2,
+      ySuelo: py,
+      yCoronilla: yCabeza + altoCabeza / 2,
+    }),
   ].map((pieza) => Object.freeze(pieza));
 }
 
@@ -327,6 +335,88 @@ function distintivoDeClase(clase, { px, py, pz, ancho, altoTorso, prefijo }) {
     case "bardo":
       return alHombro(AVATAR.madera, [0.28, altoTorso * 0.7, 0.1], { radioAbajo: 0.7, radioArriba: 0.35 });
     // El monje no lleva nada, y eso también es un distintivo.
+    default:
+      return [];
+  }
+}
+
+/**
+ * La silueta de la clase: lo que cambia el CONTORNO exterior, no un accesorio
+ * que solo se ve de frente. Es la mitad que le faltaba a `distintivoDeClase`
+ * —un arma al hombro identifica de cerca, una capucha en punta o una túnica
+ * acampanada identifican incluso a contraluz, que es la prueba de fuego de una
+ * silueta— y viene de la exploración "Gramática PSX del Avatar": tres reglas,
+ * ningún ángulo recto (todo pieza es un tronco de pirámide, `radioAbajo` ≠
+ * `radioArriba`), y la clase rompe el perfil en vez de decorar la superficie.
+ *
+ * Reusa el mismo primitivo que el resto del avatar (`piezaAvatar`/`prisma`) en
+ * vez de mallas a mano: una capa es un tronco de pirámide muy plano (`fondo`
+ * pequeño) que se ensancha hacia abajo, un sombrero cónico es uno normal boca
+ * abajo. No hace falta geometría nueva, hace falta ponerla en el sitio que
+ * toca.
+ */
+function piezasSiluetaClase(clase, { px, pz, ancho, prefijo, yHombro, ySuelo, yCoronilla }) {
+  const pieza = (nombre, color, centro, medidas, opciones) => piezaAvatar(`${prefijo}${nombre}`, color, centro, medidas, opciones);
+
+  // Dos cuñas en los hombros: MUY anchas por fuera, cerradas hacia el cuello.
+  const hombreras = (color) => [
+    pieza("HombreraIzq", color, [px - 0.4 * ancho, yHombro - 0.02, pz], [0.28 * ancho, 0.22, 0.26], { radioAbajo: 0.35, radioArriba: 1 }),
+    pieza("HombreraDer", color, [px + 0.4 * ancho, yHombro - 0.02, pz], [0.28 * ancho, 0.22, 0.26], { radioAbajo: 0.35, radioArriba: 1 }),
+  ];
+  // Un dosel plano detrás de la espalda, ensanchándose hacia el suelo.
+  const capa = (color, hasta) => {
+    const yBase = ySuelo + (yHombro - ySuelo) * hasta;
+    return [pieza("Capa", color, [px, (yHombro + yBase) / 2, pz - 0.18 * ancho], [0.62 * ancho, yHombro - yBase, 0.05], { radioAbajo: 1, radioArriba: 0.55 })];
+  };
+  // Un cono invertido (ancho arriba, cerrado abajo) desde el pecho hasta el
+  // suelo: la falda acampanada de una túnica.
+  const tunicaAcampanada = (color) => {
+    const yCadera = yHombro - (yHombro - ySuelo) * 0.32;
+    return [pieza("Tunica", color, [px, (yCadera + ySuelo) / 2, pz], [0.5 * ancho, yCadera - ySuelo, 0.42], { radioAbajo: 1, radioArriba: 0.42 })];
+  };
+  // Ancha en la base, cerrada en punta: un cono de verdad, no una tapa.
+  const capucha = (color, grande) => {
+    const alto = (yCoronilla - yHombro) * (grande ? 1.5 : 1.05);
+    return [pieza("Capucha", color, [px, yHombro + alto / 2, pz - 0.05 * ancho], [0.4 * ancho, alto, 0.36], { radioAbajo: 1, radioArriba: 0.08 })];
+  };
+  // El mismo cono que la capucha, más esbelto y sin cuerpo debajo: el
+  // sombrero puntiagudo de mago.
+  const sombreroConico = (color) => {
+    const alto = (yCoronilla - yHombro) * 1.4;
+    return [pieza("Sombrero", color, [px, yCoronilla + alto * 0.15, pz], [0.5 * ancho, alto, 0.5], { radioAbajo: 1, radioArriba: 0.04 })];
+  };
+  // Un disco muy plano y ancho: el ala de un sombrero de bardo.
+  const sombreroAla = (color) => [pieza("Ala", color, [px, yCoronilla + 0.02, pz], [0.62 * ancho, 0.03, 0.62], { radioAbajo: 0.92, radioArriba: 1 })];
+  // Igual de plano pero dorado y por encima de la cabeza, sin tocarla: la
+  // aureola del clérigo — no hay más disco vacío en todo el avatar.
+  const aureola = () => [pieza("Aureola", AVATAR.simbolo, [px, yCoronilla + 0.1, pz], [0.34 * ancho, 0.02, 0.34], { radioAbajo: 0.96, radioArriba: 1 })];
+
+  switch (clase) {
+    case "guerrero":
+      return hombreras(AVATAR.acero);
+    case "paladin":
+      return [...hombreras(AVATAR.acero), ...capa(AVATAR.capa, 0.06)];
+    case "barbaro":
+      // Pieles, no acero: mismo hueco en la silueta, otro material.
+      return hombreras(AVATAR.cuero);
+    case "picaro":
+      return capucha(AVATAR.cuero, false);
+    case "explorador":
+      return [...capucha(AVATAR.cuero, false), ...capa(AVATAR.cuero, 0.42)];
+    case "mago":
+      return [...tunicaAcampanada(AVATAR.tunica), ...sombreroConico(AVATAR.tunica)];
+    case "hechicero":
+      return tunicaAcampanada(AVATAR.tunica);
+    case "brujo":
+      return [...tunicaAcampanada(AVATAR.tunicaOscura), ...capucha(AVATAR.tunicaOscura, true)];
+    case "druida":
+      return [...tunicaAcampanada(AVATAR.natural), ...hombreras(AVATAR.natural)];
+    case "clerigo":
+      return [...tunicaAcampanada(AVATAR.simbolo), ...aureola()];
+    case "bardo":
+      return [...capa(AVATAR.capa, 0.5), ...sombreroAla(AVATAR.capa)];
+    // El monje no rompe el contorno —su distintivo es no llevar nada encima—,
+    // igual que ya declaraba `distintivoDeClase`.
     default:
       return [];
   }

@@ -238,3 +238,40 @@ test("lo que sale de avatarDesdeTexto lo entiende normalizarAvatar", () => {
   assert.equal(av.clase, "picaro");
   assert.equal(av.gesto, "fumar");
 });
+
+test("cada clase rompe el contorno con una malla válida, o deliberadamente ninguna", () => {
+  // El monje es el único caso "sin silueta", y es a propósito (ver la cabecera
+  // de piezasSiluetaClase): su distintivo es no llevar nada encima.
+  const SIN_SILUETA = new Set(["monje"]);
+  for (const clase of CLASES) {
+    const piezas = piezasAvatar({ raza: "humano", clase }, { pies: [0, 0, 0] });
+    // Las piezas de silueta llevan el nombre "Capa"/"Tunica"/"Capucha"/etc.
+    // pegado al prefijo del avatar; basta con que exista alguna para saber que
+    // se coló la pieza y no solo el arma al hombro de distintivoDeClase.
+    const deSilueta = piezas.filter((p) =>
+      /Hombrera|Capa|Tunica|Capucha|Sombrero|Ala|Aureola/.test(p.nombre),
+    );
+    if (SIN_SILUETA.has(clase)) {
+      assert.equal(deSilueta.length, 0, `${clase} no debería llevar pieza de silueta`);
+      continue;
+    }
+    assert.ok(deSilueta.length > 0, `${clase} no rompe el contorno`);
+    for (const pieza of deSilueta) {
+      assert.ok(Array.isArray(pieza.malla?.vertices) && pieza.malla.vertices.length >= 4, `${clase}: malla sin vértices`);
+      assert.ok(Array.isArray(pieza.malla?.caras) && pieza.malla.caras.length > 0, `${clase}: malla sin caras`);
+      for (const v of pieza.malla.vertices) {
+        assert.ok(v.every(Number.isFinite), `${clase}: vértice no finito en ${pieza.nombre}`);
+      }
+    }
+  }
+});
+
+test("la silueta de clase se compone igual con cualquier raza", () => {
+  // La raza decide la proporción, la clase el contorno: son capas
+  // independientes, y una no debe reventar a la otra.
+  for (const raza of RAZAS) {
+    const piezas = piezasAvatar({ raza, clase: "mago" }, { pies: [0, 0, 0] });
+    const sombrero = piezas.find((p) => p.nombre.includes("Sombrero"));
+    assert.ok(sombrero, `mago-${raza}: falta el sombrero cónico`);
+  }
+});

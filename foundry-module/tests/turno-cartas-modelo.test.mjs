@@ -1,0 +1,44 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { combinarTarjetas, galeriaDePrueba, normalizarTarjeta, tarjetaSvg } from "../scripts/turno-cartas-modelo.mjs";
+
+test("combina raza, clase, bando y estado en capas visuales", () => {
+  const carta = normalizarTarjeta({ id: "a", nombre: "Alda", raza: "elfo", clase: "mago", bando: "aliado", shiny: true, estados: ["ventaja", "concentracion"] });
+  assert.deepEqual(carta.visual.paleta, { marco: "#8fa3d9", acento: "#d8f3dc" });
+  assert.equal(carta.visual.iconoClase, "runa");
+  assert.deepEqual(carta.visual.iconoEstados, ["estrella", "ojo"]);
+  assert.equal(carta.visual.marcoShiny, "ornamentado");
+});
+
+test("los datos desconocidos no inventan raza, clase ni estados", () => {
+  const carta = normalizarTarjeta({ raza: "dragón", clase: "", bando: "villano", estados: ["volando", "muerto", "muerto"] });
+  assert.equal(carta.raza, "humano");
+  assert.equal(carta.clase, "guerrero");
+  assert.equal(carta.bando, "neutral");
+  assert.deepEqual(carta.estados, ["muerto"]);
+});
+
+test("combinarTarjetas conserva la evolución y sustituye solo el overlay", () => {
+  const base = normalizarTarjeta({ id: "a", nombre: "Alda", raza: "enano", clase: "guerrero", shiny: true });
+  const carta = combinarTarjetas(base, { estados: ["herido"] });
+  assert.equal(carta.shiny, true);
+  assert.equal(carta.raza, "enano");
+  assert.deepEqual(carta.estados, ["herido"]);
+  assert.notEqual(carta, base);
+});
+
+test("la galería cubre las nueve combinaciones de raza y clase", () => {
+  const galeria = galeriaDePrueba();
+  assert.equal(galeria.length, 9);
+  assert.equal(new Set(galeria.map((carta) => `${carta.raza}:${carta.clase}`)).size, 9);
+  assert.ok(galeria.some((carta) => carta.shiny));
+});
+
+test("el boceto SVG cambia por raza, clase y shiny sin usar binarios", () => {
+  const normal = tarjetaSvg({ nombre: "Alda", raza: "elfo", clase: "mago" });
+  const shiny = tarjetaSvg({ nombre: "Alda", raza: "elfo", clase: "mago", shiny: true });
+  assert.match(normal, /runa/);
+  assert.match(normal, /#8fa3d9/);
+  assert.doesNotMatch(normal, /stroke-dasharray/);
+  assert.match(shiny, /stroke-dasharray/);
+});

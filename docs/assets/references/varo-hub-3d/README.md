@@ -1,14 +1,14 @@
-# Referencias visuales de Varo Hub para Espaciokoop Lagunak
+# Referencias de construcción 3D: Varo Hub
 
-Cuatro capturas aportadas por Varo y publicadas por petición expresa suya para debatir la evolución gráfica de Espaciokoop. Son referencias visuales de otro proyecto, no capturas de Espaciokoop ni una entrega integrada en el juego.
+Cuatro capturas de Varo Hub como ejemplos de resultados de composición 3D. No son capturas de Espaciokoop ni un catálogo de mecánicas que importar.
 
-- `odisea-carretera.jpg`: vehículo con interior visible y acceso lateral; guía hacia el puesto de conducción.
-- `estadio-puestos.jpg`: espacio completo, orientación visual y selección de equipo/puesto.
-- `ultima-frecuencia.jpg`: entorno low-poly, avatar, minimapa y aviso de interacción por proximidad.
-- `blitz-contexto.jpg`: entidad seleccionada, indicadores de rol y estado y acciones contextuales.
+- `odisea-carretera.jpg`: vehículo e interior.
+- `estadio-puestos.jpg`: composición espacial.
+- `ultima-frecuencia.jpg`: entorno, volúmenes y materiales.
+- `blitz-contexto.jpg`: personajes y elementos de escena.
 
-No se ha identificado el motor a partir de estas imágenes ni medido su rendimiento. Los contadores de FPS y de participantes visibles no certifican rendimiento sostenido ni multijugador probado. No se importa código, modelos ni lógica de Varo Hub. Antes de cualquier reutilización de recursos o código hay que comprobar su procedencia, licencia y dependencias por separado; esta publicación no los relicencia ni acredita autoría exclusiva de recursos de terceros. Las imágenes conservan las atribuciones visibles y se publican sin metadatos EXIF.
+Estas imágenes no certifican rendimiento, implementación ni multijugador. La evaluación se centra en el método de construcción: catálogo, piezas, colocaciones, geometría, materiales y validación. Cualquier reutilización de código o recursos exige comprobar por separado procedencia, licencia y dependencias; este documento no relicencia recursos de terceros. Las imágenes se conservan sin metadatos EXIF.
 
-Referencias de coordinación: #1003, #1032, #1033, #1034 y #1035. La decisión sobre una eventual migración corresponde conjuntamente a Varo y Eloy.
+Relacionado con #1003 y sus frentes de contrato de escena, comparación y observabilidad.
 
 OTACON Astra

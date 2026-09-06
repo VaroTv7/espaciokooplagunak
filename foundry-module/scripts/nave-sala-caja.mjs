@@ -39,7 +39,7 @@ import { ANCHO_TESELA, METROS_POR_TEXEL, texturaMuro } from "./piel-textura.mjs"
 import { piezasPielHoja } from "./nave-piel-puerta.mjs";
 import { piezasPielColumna, piezasPielObjeto } from "./nave-piel-objeto.mjs";
 import { piezasPielSuelo, piezasPielTecho } from "./nave-piel-suelo.mjs";
-import { piezasLuminarias, mallaDifusorLuminarias, colorDifusorLuminaria } from "./nave-luminaria.mjs";
+import { piezasLuminarias, mallaDifusorLuminarias, colorDifusorLuminaria, focosLuminarias, piezasHazLuminarias } from "./nave-luminaria.mjs";
 import { crearPlanta } from "./nave-movimiento.mjs";
 import { poligonosOtrosJugadores } from "./nave-avatares-render.mjs";
 
@@ -701,6 +701,9 @@ export function crearSalaCaja({
   const planta = crearPlanta({ ancho, profundidad, obstaculos: [...columnas, ...obstaculosMobiliario] });
   const tieneVentanas = ventanas.length > 0;
   const cielo = tieneVentanas ? campoEstelar(semillaCielo, { cantidad: cantidadEstrellas }) : null;
+  // Los focos de las luminarias (#556): posición fija, se calculan una vez en
+  // la construcción de la sala, igual que el resto de la geometría quieta.
+  const focosSala = focosLuminarias({ ancho, profundidad, altura: ALTURA });
 
   /**
    * Compone la escena vista desde `(x, z)` mirando a `yaw`, con `y` el
@@ -765,14 +768,22 @@ export function crearSalaCaja({
         }]
       : [];
 
-    const partes = [...piezas, ...difusor, ...hojasPuertas, ...vistaVentanas].map(({ malla, color, emisivo, textura, ambiente }) =>
+    // El haz y el polvo de las luminarias más cercanas (#556): dependen de
+    // dónde está la cámara, así que se calculan aquí y no en la construcción
+    // — nunca las de la sala entera, que es la parte que costaba un +41%.
+    const hazYPolvo = piezasHazLuminarias({ ancho, profundidad, altura: ALTURA }, camara);
+
+    const partes = [...piezas, ...difusor, ...hojasPuertas, ...vistaVentanas, ...hazYPolvo].map(({ malla, color, emisivo, textura, ambiente }) =>
       componerEscena(trasladarMalla(malla, [-camara[0], -camara[1], -camara[2]]), {
         ancho: anchoLienzo,
         alto: altoLienzo,
         epoca,
         fov,
         color,
-        // Solo lo que de verdad emite: hoy, el difusor de una luminaria (#555).
+        // Solo lo que de verdad emite: el difusor de una luminaria (#555) y
+        // el haz/polvo que sale de ella (#556) — ninguno de los dos se
+        // sombrea por normal, que es lo que hace que un cono translúcido siga
+        // siendo del mismo tono lo mires desde donde lo mires.
         emisivo: emisivo === true,
         // La textura de ESTA pieza, si la trae (#584). El motor admite una por
         // llamada y funde después, así que una sala con paños texturados y
@@ -792,6 +803,11 @@ export function crearSalaCaja({
         // CÁMARA fingido rotando el mundo al revés, no el giro de una pieza
         // en una vitrina — ver el comentario de `luzFija` en `retro3d.mjs`.
         luzFija: true,
+        // Los focos de las luminarias (#556): en el mismo espacio que la luz
+        // fija (el mundo), y con la cámara ya conocida para que el motor se
+        // quede con los más cercanos si hubiera más de `TOPE_FOCOS`.
+        focos: focosSala,
+        observador: camara,
       }),
     );
 

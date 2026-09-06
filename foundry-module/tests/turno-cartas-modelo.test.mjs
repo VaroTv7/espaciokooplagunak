@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { combinarTarjetas, galeriaDePrueba, normalizarTarjeta, tarjetaSvg, tarjetasDeIniciativa } from "../scripts/turno-cartas-modelo.mjs";
+import { combinarTarjetas, galeriaDePrueba, normalizarTarjeta, tarjetaSvg, tarjetasDeIniciativa, tarjetasDesdeEstadoTurno } from "../scripts/turno-cartas-modelo.mjs";
 
 test("combina raza, clase, bando y estado en capas visuales", () => {
   const carta = normalizarTarjeta({ id: "a", nombre: "Alda", raza: "elfo", clase: "mago", bando: "aliado", shiny: true, estados: ["ventaja", "concentracion"] });
@@ -67,4 +67,19 @@ test("marca activo y siguiente sin cambiar la identidad de las cartas", () => {
   assert.equal(cartas[1].activo, true);
   assert.equal(cartas[1].posicion, 1);
   assert.equal(cartas[0].id, "a");
+});
+
+test("proyecta el estado del reducer sin convertirlo en otra fuente de verdad", () => {
+  const cartas = tarjetasDesdeEstadoTurno({
+    active: true,
+    currentIndex: 1,
+    combatants: [
+      { id: "a", name: "Alda", initiative: 12, ally: true },
+      { id: "b", name: "Borin", initiative: 8, ally: false },
+    ],
+  });
+  assert.equal(cartas[0].bando, "aliado");
+  assert.equal(cartas[1].bando, "enemigo");
+  assert.equal(cartas[1].activo, true);
+  assert.equal(cartas[0].siguiente, true);
 });

@@ -90,6 +90,21 @@ export function tarjetasDeIniciativa(participantes, { activoId = null, siguiente
   });
 }
 
+// Adaptador pequeño para el contrato de #1029. El reducer sigue siendo la
+// fuente de verdad: aquí solo se proyecta su estado a cartas visuales.
+export function tarjetasDesdeEstadoTurno(estado) {
+  const combatientes = Array.isArray(estado?.combatants) ? estado.combatants : [];
+  const actual = estado?.active ? combatientes[estado.currentIndex] : null;
+  const siguiente = actual && combatientes.length > 1
+    ? combatientes[(estado.currentIndex + 1) % combatientes.length]
+    : null;
+  return tarjetasDeIniciativa(combatientes.map((combatiente) => ({
+    ...combatiente,
+    nombre: combatiente.name,
+    bando: combatiente.ally ? "aliado" : "enemigo",
+  })), { activoId: actual?.id ?? null, siguienteId: siguiente?.id ?? null });
+}
+
 function escapar(valor) {
   return String(valor).replace(/[&<>\"]/g, (caracter) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[caracter]));
 }

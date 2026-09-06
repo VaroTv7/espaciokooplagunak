@@ -62,16 +62,29 @@ test("la proporción es la del estilo: cabeza enorme, no figura realista", () =>
   assert.ok(cabeza.medidas[1] / ALTO_BASE > 0.2, "la cabeza es demasiado pequeña para el estilo");
 });
 
-test("la gramática PSX usa mallas octogonales y volúmenes estrechados", () => {
+test("la gramática PSX usa volúmenes estrechados, en octógono o en hueso", () => {
+  // No todo es ya un único prisma vertical de dos anillos de ocho: brazos y
+  // piernas son HUESOS (`hueso()`) entre dos puntos cualesquiera, con menos
+  // lados y su propio par de anillos. La regla que importa —"ningún volumen
+  // tiene lados paralelos", la que de verdad distingue un tronco de pirámide
+  // de una caja— vale para las dos formas por igual, así que se comprueba de
+  // forma genérica: dos anillos completos, cerrados, con radio distinto.
+  const centroide = (puntos) => puntos.reduce((s, p) => [s[0] + p[0], s[1] + p[1], s[2] + p[2]], [0, 0, 0]).map((v) => v / puntos.length);
+  const radioMedio = (puntos, centro) => puntos.reduce((s, p) => s + Math.hypot(p[0] - centro[0], p[2] - centro[2]), 0) / puntos.length;
+
   const piezas = piezasAvatar({ raza: "humano", clase: "guerrero" }, { pies: [0, 0, 0] });
   for (const pieza of piezas) {
     assert.ok(pieza.malla, `${pieza.nombre} no tiene malla propia`);
-    assert.equal(pieza.malla.vertices.length, 16, `${pieza.nombre} no tiene dos anillos de ocho vértices`);
-    assert.ok(pieza.malla.caras.length >= 9, `${pieza.nombre} no está cerrado`);
+    const n = pieza.malla.vertices.length;
+    assert.ok(n % 2 === 0 && n >= 8, `${pieza.nombre} no son dos anillos completos de al menos cuatro lados`);
+    assert.ok(pieza.malla.caras.length >= n / 2, `${pieza.nombre} no está cerrado`);
+    const mitad = n / 2;
+    const anilloA = pieza.malla.vertices.slice(0, mitad);
+    const anilloB = pieza.malla.vertices.slice(mitad);
+    const radioA = radioMedio(anilloA, centroide(anilloA));
+    const radioB = radioMedio(anilloB, centroide(anilloB));
+    assert.notEqual(radioA.toFixed(4), radioB.toFixed(4), `${pieza.nombre} conserva lados paralelos`);
   }
-  const torso = piezas.find((pieza) => pieza.nombre.endsWith("Torso"));
-  const radio = (anillo) => Math.hypot(torso.malla.vertices[anillo][0], torso.malla.vertices[anillo][2]);
-  assert.notEqual(radio(0), radio(8), "el torso conserva lados paralelos");
 });
 
 test("la raza rompe la silueta además de cambiar proporciones", () => {
@@ -82,9 +95,13 @@ test("la raza rompe la silueta además de cambiar proporciones", () => {
 });
 
 test("la raza cambia estatura y anchura, y nada más", () => {
+  // Las piezas-hueso (brazos, piernas) no tienen `medidas` — su extensión
+  // vertical hay que leerla de su propia malla, no del contrato de caja de
+  // `piezaAvatar`.
+  const altoDePieza = (p) => (p.medidas ? p.centro[1] + p.medidas[1] / 2 : Math.max(...p.malla.vertices.map((v) => v[1])));
   const alto = (raza) => {
     const piezas = piezasAvatar({ raza }, { pies: [0, 0, 0] });
-    return Math.max(...piezas.map((p) => p.centro[1] + p.medidas[1] / 2));
+    return Math.max(...piezas.map(altoDePieza));
   };
   assert.ok(alto("mediano") < alto("humano"), "el mediano no es más bajo");
   assert.ok(alto("elfo") > alto("humano"), "el elfo no es más alto");
@@ -280,5 +297,40 @@ test("la silueta de clase se compone igual con cualquier raza", () => {
     const piezas = piezasAvatar({ raza, clase: "mago" }, { pies: [0, 0, 0] });
     const sombrero = piezas.find((p) => p.nombre.includes("Sombrero"));
     assert.ok(sombrero, `mago-${raza}: falta el sombrero cónico`);
+  }
+});
+
+test("hay dos piernas, no una, y cada una llega al suelo", () => {
+  const piezas = piezasAvatar({ raza: "humano" }, { pies: [0, 0, 0] });
+  const piernaIzq = piezas.filter((p) => p.nombre.includes("PiernaIzq"));
+  const piernaDer = piezas.filter((p) => p.nombre.includes("PiernaDer"));
+  assert.equal(piernaIzq.length, 2, "la pierna izquierda no tiene sus dos huesos");
+  assert.equal(piernaDer.length, 2, "la pierna derecha no tiene sus dos huesos");
+  // El hueso más bajo de cada pierna llega hasta los pies (y=0), no se queda flotando.
+  for (const pierna of [piernaIzq, piernaDer]) {
+    const yMinimo = Math.min(...pierna.flatMap((p) => p.malla.vertices.map((v) => v[1])));
+    assert.ok(yMinimo < 0.05, "la pierna no llega al suelo");
+  }
+  // Y las dos piernas están separadas: no son la misma columna central de antes.
+  const xIzq = piernaIzq[0].malla.vertices[0][0];
+  const xDer = piernaDer[0].malla.vertices[0][0];
+  assert.ok(xIzq < 0 && xDer > 0, "las piernas no están a los lados");
+});
+
+test("el brazo llega exactamente a donde está la mano de cada gesto", () => {
+  for (const gesto of GESTOS) {
+    const piezas = piezasAvatar({ gesto }, { pies: [0, 0, 0] });
+    for (const lado of ["Izq", "Der"]) {
+      const mano = piezas.find((p) => p.nombre === `avatar0Mano${lado}`);
+      const brazoB = piezas.find((p) => p.nombre === `avatar0Brazo${lado}B`);
+      assert.ok(mano && brazoB, `${gesto}: falta la mano o el antebrazo ${lado}`);
+      // El segundo anillo del segundo hueso rodea la muñeca a `radioB`: su
+      // CENTROIDE, no uno de sus vértices sueltos, es el que tiene que caer
+      // sobre el centro de la mano — es el mismo punto por construcción.
+      const anilloLejano = brazoB.malla.vertices.slice(brazoB.malla.vertices.length / 2);
+      const centroide = anilloLejano.reduce((s, v) => [s[0] + v[0], s[1] + v[1], s[2] + v[2]], [0, 0, 0]).map((v) => v / anilloLejano.length);
+      const dist = Math.hypot(centroide[0] - mano.centro[0], centroide[1] - mano.centro[1], centroide[2] - mano.centro[2]);
+      assert.ok(dist < 1e-6, `${gesto}: el brazo ${lado} no llega a la mano (dist=${dist})`);
+    }
   }
 });

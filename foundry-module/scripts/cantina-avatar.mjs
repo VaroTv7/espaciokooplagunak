@@ -98,6 +98,97 @@ function piezaAvatar(nombre, color, centro, medidas, opciones) {
   return { nombre, color, centro, medidas, malla: volumenAvatar(medidas, opciones) };
 }
 
+/**
+ * Un hueso de verdad: un tronco de pirámide entre dos puntos CUALESQUIERA,
+ * no solo vertical. `volumenAvatar` sirve para piernas, torso y cabeza
+ * porque esas piezas son verticales; un brazo no lo es —el codo se dobla
+ * hacia delante, no hacia abajo— y necesita su propio eje.
+ *
+ * De "Brazos y Andar Corregidos": brazo y pierna dejan de ser cajas sueltas
+ * flotando y pasan a ser HUESOS que conectan un punto con otro de verdad,
+ * que es lo que hacía que antes parecieran cuerdas — sin masa de hombro, sin
+ * grosor que cambie, sin ángulo real en el codo.
+ */
+function hueso(a, b, { radioA = 0.06, radioB = 0.05, lados = 6 } = {}) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], dz = b[2] - a[2];
+  const largo = Math.hypot(dx, dy, dz) || 1e-6;
+  const ejeZ = [dx / largo, dy / largo, dz / largo];
+  // Base ortonormal perpendicular al hueso: cualquier vector no paralelo a
+  // ejeZ sirve de referencia — se elige el eje mundial que menos se le parece.
+  const ref = Math.abs(ejeZ[1]) > 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const cruz = (u, v) => [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+  const normalizar = (v) => { const l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0]/l, v[1]/l, v[2]/l]; };
+  const ejeX = normalizar(cruz(ref, ejeZ));
+  const ejeY = cruz(ejeZ, ejeX);
+
+  const anillo = (centro, radio) => {
+    const puntos = [];
+    for (let i = 0; i < lados; i += 1) {
+      const ang = (i / lados) * Math.PI * 2;
+      const c = Math.cos(ang), s = Math.sin(ang);
+      puntos.push([
+        centro[0] + (ejeX[0]*c + ejeY[0]*s) * radio,
+        centro[1] + (ejeX[1]*c + ejeY[1]*s) * radio,
+        centro[2] + (ejeX[2]*c + ejeY[2]*s) * radio,
+      ]);
+    }
+    return puntos;
+  };
+
+  const vertices = [...anillo(a, radioA), ...anillo(b, radioB)];
+  const caras = [];
+  for (let i = 0; i < lados; i += 1) {
+    const j = (i + 1) % lados;
+    caras.push([i, j, lados + j, lados + i]);
+  }
+  return { vertices, caras };
+}
+
+/**
+ * El codo (o la rodilla) por cinemática inversa de dos huesos, entre un punto
+ * fijo y un objetivo — SIN rig ni ángulos por postura: dado dónde está el
+ * hombro y dónde tiene que llegar la mano, el codo cae solo donde toca.
+ *
+ * `hacia` es la dirección hacia la que se dobla la articulación —adelante
+ * para un codo, adelante para una rodilla— y es lo único que hay que decidir
+ * a mano: el resto es geometría (el triángulo hombro-codo-muñeca con esos
+ * tres lados solo tiene una solución de cada lado del eje).
+ */
+function articulacion(origen, objetivo, largoA, largoB, hacia = [0, 0, 1]) {
+  const dx = objetivo[0]-origen[0], dy = objetivo[1]-origen[1], dz = objetivo[2]-origen[2];
+  let d = Math.hypot(dx, dy, dz) || 1e-6;
+  // Un objetivo más lejos que el brazo entero, o más cerca que la diferencia
+  // de sus dos huesos, no tiene triángulo posible: se acota al límite en vez
+  // de devolver NaN, como haría un brazo estirado del todo o doblado del todo.
+  const maximo = largoA + largoB - 1e-4;
+  const minimo = Math.abs(largoA - largoB) + 1e-4;
+  d = Math.max(minimo, Math.min(maximo, d));
+  const ejeD = [dx/d, dy/d, dz/d];
+  const a = (largoA*largoA - largoB*largoB + d*d) / (2*d);
+  const h = Math.sqrt(Math.max(0, largoA*largoA - a*a));
+  // La dirección del pliegue: `hacia` menos su componente a lo largo del
+  // hueso principal, para que quede perpendicular de verdad.
+  const proyeccion = hacia[0]*ejeD[0] + hacia[1]*ejeD[1] + hacia[2]*ejeD[2];
+  let perp = [hacia[0]-ejeD[0]*proyeccion, hacia[1]-ejeD[1]*proyeccion, hacia[2]-ejeD[2]*proyeccion];
+  const largoPerp = Math.hypot(...perp) || 1;
+  perp = [perp[0]/largoPerp, perp[1]/largoPerp, perp[2]/largoPerp];
+  return [
+    origen[0] + ejeD[0]*a + perp[0]*h,
+    origen[1] + ejeD[1]*a + perp[1]*h,
+    origen[2] + ejeD[2]*a + perp[2]*h,
+  ];
+}
+
+/** Un miembro de dos huesos —brazo o pierna— entre `origen` y `objetivo`,
+ *  como dos piezas ya listas para el pintor. */
+function miembro(nombre, color, origen, objetivo, largoA, largoB, { radioA, radioMedio, radioB, hacia }) {
+  const codo = articulacion(origen, objetivo, largoA, largoB, hacia);
+  return [
+    { nombre: `${nombre}A`, color, centro: origen, medidas: null, malla: hueso(origen, codo, { radioA, radioB: radioMedio }) },
+    { nombre: `${nombre}B`, color, centro: origen, medidas: null, malla: hueso(codo, objetivo, { radioA: radioMedio, radioB }) },
+  ];
+}
+
 /** Alto total del avatar en unidades de sala, antes de la raza. Una persona
  * junto a una barra de 0.75: esto la deja mirando por encima de ella. */
 export const ALTO_BASE = 1.72;
@@ -178,13 +269,52 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
   const altoTorso = escala * 0.36;
   const altoPiernas = escala - altoCabeza - altoTorso;
 
-  const yPiernas = py + altoPiernas / 2;
-  const yTorso = py + altoPiernas + altoTorso / 2;
-  const yCabeza = py + altoPiernas + altoTorso + altoCabeza / 2;
+  const yCadera = py + altoPiernas;
+  const yTorso = yCadera + altoTorso / 2;
+  const yCabeza = yCadera + altoTorso + altoCabeza / 2;
+  const yHombro = yCadera + altoTorso * 0.86;
+
+  // Dos piernas, no una: "Brazos y Andar Corregidos" documenta con números el
+  // mismo defecto que ya se veía a ojo en la arena — una sola pierna cónica
+  // bajo el torso se lee como una peonza, no como alguien de pie. Cadera y
+  // pie de cada lado, y el HUESO —no una caja recta— hace el resto: un 4 %
+  // de holgura entre la suma de los dos tramos y la altura real es lo que le
+  // da a la rodilla su flexión de reposo sin necesidad de declarar un ángulo.
+  const anchoCadera = 0.22 * ancho;
+  const anchoPie = 0.16 * ancho;
+  const piernas = [-1, 1].flatMap((lado) =>
+    miembro(`${prefijo}Pierna${lado < 0 ? "Izq" : "Der"}`, piel,
+      [px + lado * anchoCadera, yCadera, pz],
+      [px + lado * anchoPie, py, pz],
+      altoPiernas * 0.56, altoPiernas * 0.49,
+      { radioA: 0.15 * ancho, radioMedio: 0.1 * ancho, radioB: 0.07 * ancho, hacia: [0, 0, 1] },
+    ),
+  );
+
+  const manos = manosDelGesto(av.gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel, prefijo, indice, tiempo });
+
+  // El brazo llega exactamente a donde ya está la mano de cada gesto: ningún
+  // gesto tiene que reescribirse en ángulos de hombro/codo (la tabla de
+  // "Manos que Dicen Algo" es la referencia para el día que se necesiten
+  // posturas nuevas), el hueso solo conecta el hombro con un punto que el
+  // gesto ya sabía dónde poner.
+  const largoBrazo = escala * 0.2, largoAntebrazo = escala * 0.17;
+  const brazos = ["Izq", "Der"].flatMap((lado) => {
+    const manoDeEsteLado = manos.find((p) => p.nombre === `${prefijo}Mano${lado}`);
+    if (!manoDeEsteLado) return [];
+    const signo = lado === "Izq" ? -1 : 1;
+    // El hombro nace DENTRO del torso, no en su borde exterior: es el error 2
+    // de "Brazos y Andar Corregidos", y sin corregirlo el brazo se lee como
+    // un palo pegado al cuerpo en vez de como algo que nace del hombro.
+    const hombro = [px + signo * 0.34 * ancho, yHombro, pz];
+    return miembro(`${prefijo}Brazo${lado}`, ropa, hombro, manoDeEsteLado.centro, largoBrazo, largoAntebrazo,
+      { radioA: 0.11 * ancho, radioMedio: 0.08 * ancho, radioB: 0.06 * ancho, hacia: [0, 0, 1] });
+  });
 
   return [
-    piezaAvatar(`${prefijo}Pierna`, piel, [px, yPiernas, pz], [0.3 * ancho, altoPiernas, 0.26], { radioAbajo: 0.62, radioArriba: 0.46 }),
+    ...piernas,
     piezaAvatar(`${prefijo}Torso`, ropa, [px, yTorso, pz], [0.46 * ancho, altoTorso, 0.3], { radioAbajo: 0.58, radioArriba: 0.42 }),
+    ...brazos,
     piezaAvatar(`${prefijo}Cabeza`, piel, [px, yCabeza, pz], [0.38 * ancho, altoCabeza, 0.36], { radioAbajo: 0.5, radioArriba: 0.7 }),
     // El pelo es una tapa, no una peluca: a esta resolución basta para leerse.
     piezaAvatar(`${prefijo}Pelo`, pelo, [px, yCabeza + altoCabeza * 0.42, pz - 0.02], [0.42 * ancho, altoCabeza * 0.34, 0.4], { radioAbajo: 0.7, radioArriba: 0.45 }),
@@ -193,7 +323,7 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
     // Manos como guantes, a los lados y grandes: es la firma de aquel estilo y
     // además es lo único que deja ver a distancia qué está haciendo alguien.
     // Por eso el gesto vive en las manos y no en la cara.
-    ...manosDelGesto(av.gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel, prefijo, indice, tiempo }),
+    ...manos,
     // Y lo que lleva encima, que es lo que dice la clase de un vistazo.
     ...distintivoDeClase(av.clase, { px, py: yTorso, pz, ancho, altoTorso, prefijo }),
     // Y lo que cambia el CONTORNO: capucha, capa, túnica — ver la cabecera de

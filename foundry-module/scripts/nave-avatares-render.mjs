@@ -15,12 +15,15 @@
  * sus propios muebles: colocar, proyectar, devolver polígonos para que la
  * sala los funda con los suyos y reordene junto con el resto.
  *
- * Simplificación deliberada, documentada y no escondida: el cuerpo NO gira
- * con el yaw propio de cada jugador (mismo límite que ya tienen los
- * avatares sentados de la cantina, que tampoco rotan). Girar el cuerpo
- * exigiría rotar la malla entera por vértice antes de proyectarla, no solo
- * mover dónde se coloca — encaja mejor en un PR de pulido visual aparte una
- * vez que la posición en sí ya esté verificada en vivo.
+ * EL CUERPO GIRA CON SU PROPIO YAW. Antes no lo hacía —limitación declarada
+ * aquí mismo—: el dato ya estaba en la mesa (`nave-movimiento-red.mjs`
+ * interpola el ángulo con cuidado, `{x,y,z,yaw,...}` llega completo) y este
+ * módulo lo tiraba. Se resuelve girando las piezas YA colocadas en el mundo
+ * alrededor de los pies de cada jugador — más barato que rotar cada malla en
+ * su espacio local, y con el mismo resultado para piezas mayormente
+ * simétricas de revolución (que son casi todas). El detalle asimétrico que
+ * queda sin girar de verdad (la cara, el pelo hacia atrás) es invisible a la
+ * distancia a la que se ve a otro jugador andando por un pasillo.
  *
  * Puro: ni Foundry, ni DOM, ni red, ni reloj.
  */
@@ -53,21 +56,22 @@ export function poligonosOtrosJugadores(jugadores, { camara, yaw, ancho, alto, e
   if (!Array.isArray(jugadores) || jugadores.length === 0) return [];
   const [camX, camY, camZ] = camara;
 
-  const piezas = jugadores.flatMap((jugador, indice) =>
-    piezasAvatar(jugador?.avatar ?? {}, {
-      pies: [jugador.x - camX, jugador.y - camY, jugador.z - camZ],
-      indice,
-    }),
-  );
-
-  return piezas
-    .map((pieza) =>
-      componerEscena(desplazar(pieza.malla, pieza.centro), {
+  return jugadores
+    .flatMap((jugador, indice) => {
+      const pies = [jugador.x - camX, jugador.y - camY, jugador.z - camZ];
+      const rumbo = Number.isFinite(jugador?.yaw) ? jugador.yaw : 0;
+      return piezasAvatar(jugador?.avatar ?? {}, { pies, indice }).map((pieza) => ({
+        malla: rotarAlrededorDe(desplazar(pieza.malla, pieza.centro), pies, rumbo),
+        color: pieza.color,
+      }));
+    })
+    .map(({ malla, color }) =>
+      componerEscena(malla, {
         ancho,
         alto,
         epoca,
         fov,
-        color: pieza.color,
+        color,
         posicion: [0, 0, 0],
         yaw,
         // Recorte de frustum completo (#510): un avatar visto de cerca —cruzarse
@@ -84,6 +88,20 @@ export function poligonosOtrosJugadores(jugadores, { camara, yaw, ancho, alto, e
 function desplazar(malla, [dx, dy, dz]) {
   return {
     vertices: malla.vertices.map(([x, y, z]) => [x + dx, y + dy, z + dz]),
+    caras: malla.caras,
+  };
+}
+
+/** Gira una malla ya en coordenadas de mundo alrededor de un pivote vertical
+ *  (los pies), por `angulo` radianes — el yaw del propio jugador. */
+function rotarAlrededorDe(malla, [px, , pz], angulo) {
+  if (!angulo) return malla;
+  const c = Math.cos(angulo), s = Math.sin(angulo);
+  return {
+    vertices: malla.vertices.map(([x, y, z]) => {
+      const dx = x - px, dz = z - pz;
+      return [px + dx * c + dz * s, y, pz - dx * s + dz * c];
+    }),
     caras: malla.caras,
   };
 }

@@ -69,6 +69,24 @@ export const GESTOS = Object.freeze(["quieto", "saludo", "brindis", "fumar", "ho
  * porque una silueta neutra es una opción de verdad y no un descarte. */
 export const SILUETAS = Object.freeze(["ancha", "estrecha", "neutra"]);
 
+/**
+ * El peinado, combinable (de "Caras y Peinados PSX", sección 03): un
+ * catálogo de tres ejes independientes en vez de doce mallas escritas a
+ * mano — casquete (cobertura/altura), flequillo (qué cae sobre la frente) y
+ * añadido (lo que sobresale o cuelga aparte). Se combinan libremente, así que
+ * cuatro por cuatro por cinco dan muchas más siluetas que un catálogo plano,
+ * por el mismo precio de piezas que ya paga `piezasSiluetaClase`.
+ */
+export const CORTES_PELO = Object.freeze(["rapado", "corto", "largo", "calvo"]);
+export const FLEQUILLOS = Object.freeze(["ninguno", "recto", "lateral", "pico"]);
+export const ANADIDOS_PELO = Object.freeze(["ninguno", "coleta", "mono", "melena", "cresta"]);
+
+/** Vello facial, aparte del peinado: se combina libremente con cualquier
+ * corte, y es distinto de la barba de raza del enano (rasgo fijo, no
+ * elegible) — por eso lleva su propio nombre de pieza, `Vello`, y no
+ * `Barba`. */
+export const VELLOS = Object.freeze(["ninguno", "perilla", "corto", "largo"]);
+
 /** Cuánto altera cada raza el cuerpo base. Solo estatura y anchura: el resto
  * es ropa y pelo, que se eligen aparte. Nada de rasgos "propios de raza", que
  * es por donde se cuela la caricatura. */
@@ -220,6 +238,10 @@ export function avatarDesdeTexto(texto) {
     if (RAZAS.includes(parte)) avatar.raza = parte;
     else if (CLASES.includes(parte)) avatar.clase = parte;
     else if (GESTOS.includes(parte)) avatar.gesto = parte;
+    else if (CORTES_PELO.includes(parte)) avatar.corte = parte;
+    else if (FLEQUILLOS.includes(parte)) avatar.flequillo = parte;
+    else if (ANADIDOS_PELO.includes(parte)) avatar.anadido = parte;
+    else if (VELLOS.includes(parte)) avatar.vello = parte;
     // Un número suelto es el color de ropa: es lo único del catálogo que no
     // tiene nombre, solo índice.
     else if (/^\d+$/.test(parte)) avatar.ropa = Number(parte);
@@ -238,6 +260,10 @@ export function normalizarAvatar(descripcion = {}) {
     piel: indiceValido(descripcion.piel, RETRATO.cascos.length),
     ropa: indiceValido(descripcion.ropa, FACCIONES.length),
     gesto: GESTOS.includes(descripcion.gesto) ? descripcion.gesto : "quieto",
+    corte: CORTES_PELO.includes(descripcion.corte) ? descripcion.corte : "corto",
+    flequillo: FLEQUILLOS.includes(descripcion.flequillo) ? descripcion.flequillo : "ninguno",
+    anadido: ANADIDOS_PELO.includes(descripcion.anadido) ? descripcion.anadido : "ninguno",
+    vello: VELLOS.includes(descripcion.vello) ? descripcion.vello : "ninguno",
   };
 }
 
@@ -316,8 +342,9 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
     piezaAvatar(`${prefijo}Torso`, ropa, [px, yTorso, pz], [0.46 * ancho, altoTorso, 0.3], { radioAbajo: 0.58, radioArriba: 0.42 }),
     ...brazos,
     piezaAvatar(`${prefijo}Cabeza`, piel, [px, yCabeza, pz], [0.38 * ancho, altoCabeza, 0.36], { radioAbajo: 0.5, radioArriba: 0.7 }),
-    // El pelo es una tapa, no una peluca: a esta resolución basta para leerse.
-    piezaAvatar(`${prefijo}Pelo`, pelo, [px, yCabeza + altoCabeza * 0.42, pz - 0.02], [0.42 * ancho, altoCabeza * 0.34, 0.4], { radioAbajo: 0.7, radioArriba: 0.45 }),
+    // El peinado combinable: casquete + flequillo + añadido, más el vello
+    // facial aparte — ver la cabecera de `piezasPelo`.
+    ...piezasPelo(av, { px, pz, yCabeza, altoCabeza, ancho, color: pelo, prefijo }),
     ...rasgoDeRaza(av.raza, { px, pz, yCabeza, altoCabeza, ancho, piel, prefijo }),
     ...caraDeAvatar({ px, pz, yCabeza, altoCabeza, ancho, piel, prefijo, mirada }),
     // Manos como guantes, a los lados y grandes: es la firma de aquel estilo y
@@ -486,6 +513,99 @@ function caraDeAvatar({ px, pz, yCabeza, altoCabeza, ancho, piel, prefijo, mirad
     [px + lado * 0.16 * ancho, yOjos + altoCabeza * 0.16, zFrente], [0.13 * ancho, altoCabeza * 0.045, 0.02], { radioAbajo: 1, radioArriba: 0.7 });
 
   return [...ojo(-1), ...ojo(1), ceja(-1), ceja(1)];
+}
+
+/**
+ * El peinado, combinable: casquete + flequillo + añadido, más el vello
+ * facial (aparte, porque se combina libremente con cualquiera de los tres).
+ * De "Caras y Peinados PSX" sección 03: tres piezas pequeñas dan muchas más
+ * siluetas que doce peinados escritos a mano, el mismo principio que ya usa
+ * el catálogo de props — una entrada más, no una rama más. Sustituye a la
+ * única tapa genérica que había antes.
+ *
+ * Reusa el mismo primitivo que el resto del avatar (`piezaAvatar`/`prisma`):
+ * ningún peinado es geometría nueva, todos son troncos de pirámide en el
+ * sitio y la proporción que toca — la misma disciplina que
+ * `piezasSiluetaClase`.
+ */
+function piezasPelo({ corte, flequillo, anadido, vello }, { px, pz, yCabeza, altoCabeza, ancho, color, prefijo }) {
+  const piezas = [];
+  const yCoronilla = yCabeza + altoCabeza / 2;
+  const zFrente = pz + 0.16 * 0.36;
+
+  // El casquete: la tapa de siempre, con tres alturas — "largo" cubre más
+  // cráneo, "rapado" casi no sobresale, y "calvo" no pone pieza ninguna.
+  if (corte !== "calvo") {
+    const alto = { rapado: altoCabeza * 0.14, corto: altoCabeza * 0.34, largo: altoCabeza * 0.48 }[corte];
+    const bajada = { rapado: 0.46, corto: 0.42, largo: 0.34 }[corte];
+    piezas.push(piezaAvatar(`${prefijo}Casquete`, color,
+      [px, yCabeza + altoCabeza * bajada, pz - 0.02], [0.42 * ancho, alto, 0.4],
+      { radioAbajo: 0.7, radioArriba: 0.45 }));
+  }
+
+  // El flequillo: una cuña sobre la frente, delante de la cara. No tiene
+  // sentido sin casquete —sería pelo flotando— así que también se apaga con
+  // "calvo".
+  if (flequillo !== "ninguno" && corte !== "calvo") {
+    const yFrente = yCabeza + altoCabeza * 0.14;
+    if (flequillo === "recto") {
+      piezas.push(piezaAvatar(`${prefijo}Flequillo`, color,
+        [px, yFrente, zFrente], [0.36 * ancho, altoCabeza * 0.12, 0.1],
+        { radioAbajo: 0.9, radioArriba: 0.6 }));
+    } else if (flequillo === "lateral") {
+      piezas.push(piezaAvatar(`${prefijo}Flequillo`, color,
+        [px + 0.14 * ancho, yFrente, zFrente], [0.3 * ancho, altoCabeza * 0.14, 0.1],
+        { radioAbajo: 0.95, radioArriba: 0.4 }));
+    } else if (flequillo === "pico") {
+      piezas.push(piezaAvatar(`${prefijo}Flequillo`, color,
+        [px, yFrente + altoCabeza * 0.04, zFrente], [0.14 * ancho, altoCabeza * 0.18, 0.08],
+        { radioAbajo: 0.2, radioArriba: 1 }));
+    }
+  }
+
+  // El añadido: lo que cuelga o sobresale, aparte del casquete — cola,
+  // moño, melena o cresta. Igual que el flequillo, no aplica sobre "calvo".
+  if (corte !== "calvo") {
+    if (anadido === "coleta") {
+      piezas.push(piezaAvatar(`${prefijo}Coleta`, color,
+        [px, yCoronilla - altoCabeza * 0.3, pz - 0.22 * ancho], [0.12 * ancho, altoCabeza * 0.6, 0.14],
+        { radioAbajo: 0.35, radioArriba: 0.85 }));
+    } else if (anadido === "mono") {
+      piezas.push(piezaAvatar(`${prefijo}Mono`, color,
+        [px, yCoronilla + altoCabeza * 0.08, pz], [0.16 * ancho, altoCabeza * 0.2, 0.16],
+        { radioAbajo: 0.7, radioArriba: 0.35 }));
+    } else if (anadido === "melena") {
+      piezas.push(piezaAvatar(`${prefijo}Melena`, color,
+        [px, yCabeza - altoCabeza * 0.5, pz - 0.2 * ancho], [0.4 * ancho, altoCabeza * 1.3, 0.12],
+        { radioAbajo: 0.55, radioArriba: 0.9 }));
+    } else if (anadido === "cresta") {
+      piezas.push(piezaAvatar(`${prefijo}Cresta`, color,
+        [px, yCoronilla + altoCabeza * 0.14, pz], [0.08 * ancho, altoCabeza * 0.3, 0.32],
+        { radioAbajo: 0.4, radioArriba: 0.9 }));
+    }
+  }
+
+  // El vello facial: independiente del peinado, junto a la mandíbula. Lleva
+  // nombre `Vello` y no `Barba` para no chocar con el rasgo fijo de raza del
+  // enano en `rasgoDeRaza` — las dos pueden coexistir sin pisarse.
+  if (vello !== "ninguno") {
+    const yMenton = yCabeza - altoCabeza * 0.42;
+    if (vello === "perilla") {
+      piezas.push(piezaAvatar(`${prefijo}Vello`, color,
+        [px, yMenton - altoCabeza * 0.06, zFrente - 0.02], [0.12 * ancho, altoCabeza * 0.14, 0.08],
+        { radioAbajo: 0.3, radioArriba: 0.8 }));
+    } else if (vello === "corto") {
+      piezas.push(piezaAvatar(`${prefijo}Vello`, color,
+        [px, yMenton - altoCabeza * 0.05, zFrente - 0.02], [0.26 * ancho, altoCabeza * 0.22, 0.14],
+        { radioAbajo: 0.4, radioArriba: 0.85 }));
+    } else if (vello === "largo") {
+      piezas.push(piezaAvatar(`${prefijo}Vello`, color,
+        [px, yMenton - altoCabeza * 0.22, zFrente - 0.02], [0.24 * ancho, altoCabeza * 0.5, 0.2],
+        { radioAbajo: 0.15, radioArriba: 0.75 }));
+    }
+  }
+
+  return piezas;
 }
 
 function rasgoDeRaza(raza, { px, pz, yCabeza, altoCabeza, ancho, piel, prefijo }) {

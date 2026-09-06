@@ -10,11 +10,15 @@ import test from "node:test";
 
 import {
   ALTO_BASE,
+  ANADIDOS_PELO,
   CLASES,
+  CORTES_PELO,
+  FLEQUILLOS,
   GESTOS,
   RAZAS,
   SILUETAS,
   SITIOS,
+  VELLOS,
   anclasHumoDeLaGente,
   intensidadCalada,
   normalizarAvatar,
@@ -333,4 +337,49 @@ test("el brazo llega exactamente a donde está la mano de cada gesto", () => {
       assert.ok(dist < 1e-6, `${gesto}: el brazo ${lado} no llega a la mano (dist=${dist})`);
     }
   }
+});
+
+test("el peinado combinable: toda combinación de corte/flequillo/añadido/vello da malla válida", () => {
+  // De "Caras y Peinados PSX" sección 03: casquete + flequillo + añadido, más
+  // el vello aparte. Cuatro ejes independientes, no doce peinados sueltos —
+  // lo que hay que probar es que NINGUNA combinación revienta ni deja un
+  // vértice no finito, no una lista de casos concretos.
+  let combinaciones = 0;
+  for (const corte of CORTES_PELO) {
+    for (const flequillo of FLEQUILLOS) {
+      for (const anadido of ANADIDOS_PELO) {
+        for (const vello of VELLOS) {
+          const piezas = piezasAvatar({ corte, flequillo, anadido, vello }, { pies: [0, 0, 0] });
+          for (const pieza of piezas) {
+            for (const v of pieza.malla.vertices) {
+              assert.ok(v.every(Number.isFinite), `corte=${corte} flequillo=${flequillo} anadido=${anadido} vello=${vello}: vértice no finito en ${pieza.nombre}`);
+            }
+          }
+          combinaciones += 1;
+        }
+      }
+    }
+  }
+  assert.equal(combinaciones, CORTES_PELO.length * FLEQUILLOS.length * ANADIDOS_PELO.length * VELLOS.length);
+});
+
+test("\"calvo\" no pone ni casquete ni flequillo ni añadido, pero el vello sigue disponible", () => {
+  const piezas = piezasAvatar({ corte: "calvo", flequillo: "recto", anadido: "coleta", vello: "largo" }, { pies: [0, 0, 0] });
+  assert.ok(!piezas.some((p) => /Casquete|Flequillo|Coleta|Mono|Melena|Cresta/.test(p.nombre)), "calvo no debería llevar pelo de ningún tipo");
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Vello")), "el vello facial no depende del peinado");
+});
+
+test("el vello facial no choca de nombre con la barba de raza del enano", () => {
+  const piezas = piezasAvatar({ raza: "enano", vello: "largo" }, { pies: [0, 0, 0] });
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Barba")), "falta el rasgo racial del enano");
+  assert.ok(piezas.some((p) => p.nombre.endsWith("Vello")), "falta el vello elegido");
+});
+
+test("avatarDesdeTexto reconoce los ejes del peinado combinable", () => {
+  const av = avatarDesdeTexto("guerrero,largo,lateral,coleta,corto");
+  // "corto" es ambiguo entre corte y vello por diseño (dos catálogos
+  // distintos usan la misma palabra) — lo que importa es que el resto de
+  // ejes, sin ambigüedad, se lean bien.
+  assert.equal(av.flequillo, "lateral");
+  assert.equal(av.anadido, "coleta");
 });

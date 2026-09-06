@@ -252,6 +252,13 @@ export const AVATAR = Object.freeze({
   capa: "#7a2f3a", // capa de paladín/bardo
   cuero: "#6b5136", // capucha y correaje de pícaro/explorador
   natural: "#5c7a4a", // hombreras de follaje de la druida
+  // Cara (#973/#974, "Rostro sin ser Minecraft" → opción de relieve mínimo):
+  // la cuenca es geometría hundida de verdad, no una textura — así la sombra
+  // la resuelve `intensidadCara` con la luz de la escena, como todo lo demás.
+  ojo: "#1c1712", // la pupila: casi negra, nunca plano puro
+  ojoBrillo: "#e8dccb", // el único píxel claro del ojo — sin él, el hueco se lee como un agujero, no como un ojo
+  sombraCara: "#100c08", // hacia dónde se mezcla la piel en la cuenca y la ceja — nunca negro puro suelto en el módulo
+
   // Lo que se lleva en la mano según el gesto.
   jarra: "#e0a33a", // el mismo ámbar de la cerveza de la barra
   cigarro: "#e8e4d8",

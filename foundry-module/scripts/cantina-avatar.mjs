@@ -161,7 +161,7 @@ function indiceValido(valor, cuantos) {
  * medidas}`— para que la escena no distinga a una persona de un taburete y no
  * haga falta ni un pintor nuevo ni una rama en `componerCantina`.
  */
-export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo = 0 } = {}) {
+export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo = 0, mirada = null } = {}) {
   const av = normalizarAvatar(descripcion);
   const cuerpo = CUERPO_POR_RAZA[av.raza];
   const escala = ALTO_BASE * cuerpo.alto;
@@ -189,6 +189,7 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
     // El pelo es una tapa, no una peluca: a esta resolución basta para leerse.
     piezaAvatar(`${prefijo}Pelo`, pelo, [px, yCabeza + altoCabeza * 0.42, pz - 0.02], [0.42 * ancho, altoCabeza * 0.34, 0.4], { radioAbajo: 0.7, radioArriba: 0.45 }),
     ...rasgoDeRaza(av.raza, { px, pz, yCabeza, altoCabeza, ancho, piel, prefijo }),
+    ...caraDeAvatar({ px, pz, yCabeza, altoCabeza, ancho, piel, prefijo, mirada }),
     // Manos como guantes, a los lados y grandes: es la firma de aquel estilo y
     // además es lo único que deja ver a distancia qué está haciendo alguien.
     // Por eso el gesto vive en las manos y no en la cara.
@@ -241,26 +242,40 @@ export function intensidadCalada(tiempoMs = 0, offset = 0) {
  * humo, y quien fuma lo alimenta (ver `ANCLAS_AIRE` en `cantina-escena.mjs`).
  */
 function manosDelGesto(gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel, prefijo, indice = 0, tiempo = 0 }) {
-  const mano = (lado, [dx, dy, dz], nombre = "Mano") => ({
-    nombre: `${prefijo}${nombre}${lado}`,
-    color: piel,
-    centro: [px + dx * ancho, dy, pz + dz],
-    medidas: [0.16, 0.16, 0.16],
-    malla: volumenAvatar([0.16, 0.16, 0.16], { radioAbajo: 0.75, radioArriba: 0.5 }),
-  });
+  // "Manos que Dicen Algo" (#975): la forma recomendada es la MANOPLA CON
+  // PULGAR, no la cuña cerrada — el pulgar es lo que dice "esta mano puede
+  // agarrar algo", y es la diferencia entre una mano y un guante sin dedos.
+  // Sigue siendo UNA llamada a `mano()` por mano: el pulgar se cuelga solo,
+  // así que ningún gesto de más abajo tiene que enterarse del cambio.
+  const mano = (lado, [dx, dy, dz], nombre = "Mano") => {
+    const centro = [px + dx * ancho, dy, pz + dz];
+    const signo = lado === "Izq" ? -1 : 1;
+    const principal = {
+      nombre: `${prefijo}${nombre}${lado}`,
+      color: piel,
+      centro,
+      medidas: [0.16, 0.16, 0.16],
+      malla: volumenAvatar([0.16, 0.16, 0.16], { radioAbajo: 0.75, radioArriba: 0.5 }),
+    };
+    // El pulgar: más corto y más grueso, saliendo hacia el lado de dentro de
+    // la mano — nunca hacia fuera, o parecería una segunda mano pegada.
+    const pulgar = piezaAvatar(`${prefijo}Pulgar${lado}`, piel,
+      [centro[0] - signo * 0.09 * ancho, centro[1] - 0.02, centro[2] + 0.04], [0.08, 0.09, 0.08], { radioAbajo: 0.6, radioArriba: 0.9 });
+    return [principal, pulgar];
+  };
   const reposo = yTorso - altoTorso * 0.2;
 
   switch (gesto) {
     // Una mano en alto. El saludo es el gesto que más se usa y por eso es el más
     // claro de leer: mano por encima del hombro y separada del cuerpo.
     case "saludo":
-      return [mano("Izq", [-0.3, reposo, 0.06]), mano("Der", [0.42, yCabeza, 0.1])];
+      return [...mano("Izq", [-0.3, reposo, 0.06]), ...mano("Der", [0.42, yCabeza, 0.1])];
     // Brindis: la jarra en alto, hacia delante. Se brinda CON alguien, así que
     // el brazo va adelantado y no pegado al costado.
     case "brindis":
       return [
-        mano("Izq", [-0.3, reposo, 0.06]),
-        mano("Der", [0.34, yTorso + altoTorso * 0.35, 0.24]),
+        ...mano("Izq", [-0.3, reposo, 0.06]),
+        ...mano("Der", [0.34, yTorso + altoTorso * 0.35, 0.24]),
         piezaAvatar(`${prefijo}Jarra`, AVATAR.jarra, [px + 0.34 * ancho, yTorso + altoTorso * 0.55, pz + 0.24], [0.18, 0.24, 0.18], { radioAbajo: 0.65, radioArriba: 0.8 }),
       ];
     // Fumar: la mano junto a la cara y el cigarro asomando. La brasa es un píxel
@@ -273,22 +288,74 @@ function manosDelGesto(gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel,
       // se lee como un parpadeo de escenario, no como gente fumando.
       const calada = intensidadCalada(tiempo, indice);
       return [
-        mano("Izq", [-0.3, reposo, 0.06]),
-        mano("Der", [0.26, yCabeza - 0.12, 0.22]),
+        ...mano("Izq", [-0.3, reposo, 0.06]),
+        ...mano("Der", [0.26, yCabeza - 0.12, 0.22]),
         piezaAvatar(`${prefijo}Cigarro`, AVATAR.cigarro, [px + 0.26 * ancho, yCabeza - 0.06, pz + 0.3], [0.05, 0.05, 0.18], { radioAbajo: 0.8, radioArriba: 0.55 }),
         piezaAvatar(`${prefijo}Brasa`, mezclar(AVATAR.brasa, AVATAR.brasaCalada, calada), puntaDelCigarro({ px, pz, yCabeza, ancho }), [0.06, 0.06, 0.06], { radioAbajo: 0.8, radioArriba: 0.45 }),
       ];
     }
     // Hombros: las dos manos abiertas hacia fuera y arriba. «Yo qué sé».
     case "hombros":
-      return [mano("Izq", [-0.46, yTorso, 0.16]), mano("Der", [0.46, yTorso, 0.16])];
+      return [...mano("Izq", [-0.46, yTorso, 0.16]), ...mano("Der", [0.46, yTorso, 0.16])];
     // Pensar: una mano en la barbilla. En un juego de faroleo es el gesto más
     // útil de todos, porque dice «me lo estoy pensando» sin decir qué.
     case "pensar":
-      return [mano("Izq", [-0.3, reposo, 0.06]), mano("Der", [0.12, yCabeza - 0.16, 0.26])];
+      return [...mano("Izq", [-0.3, reposo, 0.06]), ...mano("Der", [0.12, yCabeza - 0.16, 0.26])];
     default:
-      return [mano("Izq", [-0.3, reposo, 0.06]), mano("Der", [0.3, reposo, 0.06])];
+      return [...mano("Izq", [-0.3, reposo, 0.06]), ...mano("Der", [0.3, reposo, 0.06])];
   }
+}
+
+/**
+ * La cara, con cuencas hundidas y una pupila que puede seguir a algo.
+ *
+ * De "Rostro sin ser Minecraft" (#973): geometría real —un hueco, no una
+ * textura—, para que la sombra que lo delata salga de `intensidadCara` con la
+ * luz de la escena, no de un píxel fijo. Es la opción de relieve mínimo, y no
+ * la de textura con bisel horneado: dos o tres piezas más por avatar es barato
+ * comparado con lo que cuesta que una cara se lea plana.
+ *
+ * `mirada` es de "Mirada Viva" (#974): un vector en [-1,1]×[-1,1] que mueve la
+ * pupila DENTRO del hueco, con tope — nunca sale de la cuenca. Quién mira a
+ * qué es una decisión de otro módulo (la política de "A qué miran los NPC"
+ * necesita saber quién habla, qué se acaba de mover, si hay alarma — eso es
+ * comportamiento, no geometría, y no vive aquí). Sin mirada explícita, los
+ * ojos miran al frente — que es exactamente "a su tarea", la política por
+ * defecto que esa exploración marcó como la que hace que la nave parezca un
+ * sitio de trabajo y no una sala esperando al jugador.
+ */
+function caraDeAvatar({ px, pz, yCabeza, altoCabeza, ancho, piel, prefijo, mirada = null }) {
+  const mx = Math.max(-1, Math.min(1, mirada?.x ?? 0));
+  const my = Math.max(-1, Math.min(1, mirada?.y ?? 0));
+  const yOjos = yCabeza + altoCabeza * 0.05;
+  const zFrente = pz + 0.16 * 0.36; // la mitad del fondo de la cabeza: a ras de la cara
+  const huecoColor = mezclar(piel, AVATAR.sombraCara, 0.42);
+
+  const ojo = (lado) => {
+    const cx = px + lado * 0.13 * ancho;
+    // El hueco: una caja hundida, más ancha que alta — la sombra de su cara
+    // superior es lo que dice "esto está hundido", y sale sola de la luz.
+    const hueco = piezaAvatar(`${prefijo}Cuenca${lado > 0 ? "Der" : "Izq"}`, huecoColor,
+      [cx, yOjos, zFrente - 0.015], [0.1 * ancho, altoCabeza * 0.14, 0.03], { radioAbajo: 0.9, radioArriba: 1 });
+    // La pupila: pieza suelta, un pelo por delante del fondo del hueco, que se
+    // desplaza dentro de los topes de la cuenca — la opción B de "Mirada Viva"
+    // ("pieza suelta delante del hueco"): no recalcula la cabeza, solo se
+    // mueve ella misma.
+    const recorridoX = 0.045 * ancho;
+    const recorridoY = altoCabeza * 0.05;
+    const pupila = piezaAvatar(`${prefijo}Pupila${lado > 0 ? "Der" : "Izq"}`, AVATAR.ojo,
+      [cx + mx * recorridoX, yOjos + my * recorridoY, zFrente + 0.01], [0.035 * ancho, altoCabeza * 0.07, 0.02], { radioAbajo: 1, radioArriba: 0.85 });
+    return [hueco, pupila];
+  };
+
+  // Cejas: el único vehículo de expresión que existe hoy, dos cuñas fijas.
+  // "Mirada Viva" las anima con tres números (dy/ang/asim); moverlas de
+  // verdad es una decisión de comportamiento —de dónde sale la expresión de un
+  // NPC— y no de esta pieza, que solo sabe dibujarlas quietas.
+  const ceja = (lado) => piezaAvatar(`${prefijo}Ceja${lado > 0 ? "Der" : "Izq"}`, mezclar(piel, AVATAR.sombraCara, 0.55),
+    [px + lado * 0.16 * ancho, yOjos + altoCabeza * 0.16, zFrente], [0.13 * ancho, altoCabeza * 0.045, 0.02], { radioAbajo: 1, radioArriba: 0.7 });
+
+  return [...ojo(-1), ...ojo(1), ceja(-1), ceja(1)];
 }
 
 function rasgoDeRaza(raza, { px, pz, yCabeza, altoCabeza, ancho, piel, prefijo }) {

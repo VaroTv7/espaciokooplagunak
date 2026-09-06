@@ -201,13 +201,20 @@ test("un gesto que no existe deja a la persona quieta, no rota", () => {
   assert.deepEqual(raro, quieto);
 });
 
-test("no hay gestos de cara, y es a propósito", () => {
-  // Estos avatares no tienen ojos ni boca: es lo que los hace legibles a esta
-  // resolución. Si algún día se añade un guiño, hará falta darles cara primero,
-  // y eso es una decisión de estilo — no un gesto más.
+test("la cara es la misma para cualquier gesto — el gesto vive en las manos", () => {
+  // Antes esto comprobaba que NO había cara (#423): sin ojos ni boca, por
+  // legibilidad a esta resolución. "Rostro sin ser Minecraft" (#973) decidió
+  // lo contrario — geometría real de cuenca+pupila, sombreada por la luz de la
+  // escena en vez de un píxel fijo — así que la invariante que queda es la que
+  // sigue importando: el REPERTORIO de gestos (`GESTOS`) sigue viviendo en las
+  // manos, no en la cara. Un "brindis" no debería fruncir un ceño que un
+  // "quieto" no frunce; eso sería un gesto de cara colándose por la puerta de
+  // atrás.
+  const caraDe = (piezas) => piezas.filter((p) => /Cuenca|Pupila|Ceja/.test(p.nombre));
+  const referencia = caraDe(piezasAvatar({ gesto: "quieto" }, { pies: [0, 0, 0] }));
   for (const gesto of GESTOS) {
-    const piezas = piezasAvatar({ gesto }, { pies: [0, 0, 0] });
-    assert.ok(!piezas.some((p) => /Ojo|Boca|Ceja/.test(p.nombre)), `${gesto} ha inventado una cara`);
+    const cara = caraDe(piezasAvatar({ gesto }, { pies: [0, 0, 0] }));
+    assert.deepEqual(cara, referencia, `${gesto} ha cambiado la cara`);
   }
 });
 

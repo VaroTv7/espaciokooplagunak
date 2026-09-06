@@ -29,6 +29,8 @@ import { openWorkspaceApp } from "./station-workspace-ui.mjs";
 import { SECCION } from "./paleta.mjs";
 import { cartelaDe, piezaPorId } from "./catalogo-piezas.mjs";
 import { CATALOGO_MUSEO } from "./museo-piezas.mjs";
+import { resolverInvestigacion } from "./libro-srd-investigacion.mjs";
+import { rollD20 } from "./dado-util.mjs";
 import { AJUSTE_TELEMETRIA, aceptarSensores, aceptarTelemetria } from "./ship-view/telemetria-difusion.mjs";
 import { AJUSTE_NIVEL_ALERTA } from "./alerta-escena.mjs";
 
@@ -304,6 +306,23 @@ function arrancar(raiz, estanciaPedida = null) {
     nodo.hidden = false;
   }
 
+  function pintarInvestigacion(visible) {
+    const panel = raiz?.querySelector?.("[data-andar-investigacion]");
+    if (!panel) return;
+    panel.hidden = !visible;
+    const cartela = raiz?.querySelector?.("[data-andar-cartela]");
+    if (cartela && visible) cartela.hidden = false;
+    if (!visible) return;
+    const resultado = panel.querySelector?.("[data-investigacion-resultado]");
+    panel.querySelectorAll?.("[data-investigacion-habilidad]").forEach((boton) => {
+      boton.onclick = () => {
+        const tirada = rollD20();
+        const prueba = resolverInvestigacion({ habilidad: boton.dataset.investigacionHabilidad, dc: 12, tiradas: [tirada] });
+        if (resultado) resultado.textContent = `${prueba.exito ? "Éxito" : "Fallo"}: ${prueba.habilidad} ${prueba.total}/${prueba.dc}`;
+      };
+    });
+  }
+
   let ultimoSelloEnviado = null;
 
   // Muestras en vivo de los demás jugadores (#453), acumuladas por
@@ -440,6 +459,7 @@ function arrancar(raiz, estanciaPedida = null) {
       // El texto sale del catálogo —que es el dato— y solo el nombre de la
       // naturaleza sale de i18n, que es interfaz.
       else if (accion?.tipo === "cartela") pintarCartela(accion.pieza);
+      else if (accion?.tipo === "investigar-libro") pintarInvestigacion(true);
       // Un punto que lleva a otra estancia (#587: la cabina de teléfono de la
       // playa devuelve a la nave). Reusa EXACTAMENTE el camino de una puerta en
       // vez de tener su propio salto: cambiar de estancia ya está resuelto, y
@@ -453,7 +473,10 @@ function arrancar(raiz, estanciaPedida = null) {
     // Alejarse la retira (#598). Va por el flanco de SALIDA del bucle y no por
     // un temporizador: una cartela se deja de leer cuando te apartas, no cuando
     // pasan unos segundos.
-    alSalirDeInteraccion: () => pintarCartela(null),
+    alSalirDeInteraccion: () => {
+      pintarCartela(null);
+      pintarInvestigacion(false);
+    },
     // El de la estancia de ARRANQUE, no el de la nave (#587). Sin esto, abrir
     // directamente en un exterior pintaba su cielo con el gris de entre salas y
     // solo se corregía al cambiar de estancia — que en la playa no pasa nunca,

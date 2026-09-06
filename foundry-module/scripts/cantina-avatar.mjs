@@ -1,26 +1,25 @@
 // Avatares de la cantina (#423 sobre #362): quién está en la sala.
-//
+//\
 // ESTILO: FF7 ORIGINAL, Y NO ES NOSTALGIA. Aquellos muñecos eran cajas con
 // manos como guantes y sin cara, y funcionaban por una razón técnica que aquí
 // se repite igual: con pocos polígonos y sin texturas, una figura ESTILIZADA se
-// lee y una realista se deshace. Proporción de unas cuatro cabezas —no ocho—,
+// lee y una realista se deshace. Proporción de unas cuatro cabezas —no ocho—,\
 // manos exageradas para que se vea qué hace, y ni ojos ni boca: la cara la pone
 // quien mira. Intentar una figura proporcionada con doce cajas da un espantajo.
-//
+//\
 // LO QUE SE PUEDE USAR SIN PAGAR. Las clases salen del SRD 5.1, publicado bajo
 // CC-BY-4.0: las doce están ahí y se pueden nombrar con atribución. Las RAZAS
-// son otra historia — el SRD solo trae unas pocas, y las que faltan (dragonborn,
+// son otra historia — el SRD solo trae unas pocas, y las que faltan (dragonborn,\
 // tiefling, gnome, half-orc, half-elf) NO están bajo esa licencia. Aquí no se
 // nombran: quien quiera una escribe la suya en el campo libre, y el catálogo
-// ofrece solo lo licenciado más un genérico. Ver `reference_srd_5e_cc_by`.
-//
+// ofrece solo lo licenciado más un genérico. Ver `reference_srd_5e_cc_by`.\
+//\
 // Puro: ni Foundry, ni DOM, ni red, ni reloj. Recibe una descripción y devuelve
 // mallas; quien las pinta y quien las guarda viven fuera.
-//
+//\
 // Frontera de arte (#351): no declara ni un color.
-
+//\
 import { AVATAR, FACCIONES, PIXEL, RETRATO } from "./paleta.mjs";
-import { caja } from "./cantina-escena.mjs";
 import { mezclar } from "./retro3d.mjs";
 
 /**
@@ -45,7 +44,7 @@ export const CLASES = Object.freeze([
 
 /**
  * Razas que SÍ podemos nombrar. El SRD 5.1 trae estas; las demás son marca
- * registrada y no entran en el catálogo, ni siquiera "por defecto". `otra` es
+ * registrada y no entran en el catálogo, ni siquiera "por defecto\". `otra` es
  * la salida honesta: quien juega una raza que no está escribe su nombre y el
  * avatar usa el cuerpo genérico.
  */
@@ -72,7 +71,7 @@ export const SILUETAS = Object.freeze(["ancha", "estrecha", "neutra"]);
 /** Cuánto altera cada raza el cuerpo base. Solo estatura y anchura: el resto
  * es ropa y pelo, que se eligen aparte. Nada de rasgos "propios de raza", que
  * es por donde se cuela la caricatura. */
-const CUERPO_POR_RAZA = Object.freeze({
+export const CUERPO_POR_RAZA = Object.freeze({
   humano: { alto: 1, ancho: 1 },
   enano: { alto: 0.78, ancho: 1.25 },
   elfo: { alto: 1.06, ancho: 0.92 },
@@ -80,7 +79,7 @@ const CUERPO_POR_RAZA = Object.freeze({
   otra: { alto: 1, ancho: 1 },
 });
 
-const SILUETA_ANCHO = Object.freeze({ ancha: 1.18, estrecha: 0.88, neutra: 1 });
+export const SILUETA_ANCHO = Object.freeze({ ancha: 1.18, estrecha: 0.88, neutra: 1 });
 
 /** Alto total del avatar en unidades de sala, antes de la raza. Una persona
  * junto a una barra de 0.75: esto la deja mirando por encima de ella. */
@@ -106,6 +105,18 @@ export function normalizarAvatar(descripcion = {}) {
 function indiceValido(valor, cuantos) {
   const n = Number.parseInt(valor, 10);
   return Number.isFinite(n) ? ((n % cuantos) + cuantos) % cuantos : 0;
+}
+
+/**
+ * Helper to create a box piece.
+ * @param {string} nombre
+ * @param {string} color
+ * @param {Array<number>} centro
+ * @param {Array<number>} medidas
+ * @returns {{nombre:string, color:string, centro:number[], medidas:number[]}}
+ */
+function pieza(nombre, color, centro, medidas) {
+  return { nombre, color, centro, medidas };
 }
 
 /**
@@ -136,23 +147,18 @@ export function piezasAvatar(descripcion, { pies = [0, 0, 0], indice = 0, tiempo
   const yCabeza = py + altoPiernas + altoTorso + altoCabeza / 2;
 
   return [
-    { nombre: `${prefijo}Pierna`, color: piel, centro: [px, yPiernas, pz], medidas: [0.3 * ancho, altoPiernas, 0.26] },
-    { nombre: `${prefijo}Torso`, color: ropa, centro: [px, yTorso, pz], medidas: [0.46 * ancho, altoTorso, 0.3] },
-    { nombre: `${prefijo}Cabeza`, color: piel, centro: [px, yCabeza, pz], medidas: [0.38 * ancho, altoCabeza, 0.36] },
+    pieza(`${prefijo}Pierna`, piel, [px, yPiernas, pz], [0.3 * ancho, altoPiernas, 0.26]),
+    pieza(`${prefijo}Torso`, ropa, [px, yTorso, pz], [0.46 * ancho, altoTorso, 0.3]),
+    pieza(`${prefijo}Cabeza`, piel, [px, yCabeza, pz], [0.38 * ancho, altoCabeza, 0.36]),
     // El pelo es una tapa, no una peluca: a esta resolución basta para leerse.
-    {
-      nombre: `${prefijo}Pelo`,
-      color: pelo,
-      centro: [px, yCabeza + altoCabeza * 0.42, pz - 0.02],
-      medidas: [0.42 * ancho, altoCabeza * 0.34, 0.4],
-    },
+    pieza(`${prefijo}Pelo`, pelo, [px, yCabeza + altoCabeza * 0.42, pz - 0.02], [0.42 * ancho, altoCabeza * 0.34, 0.4]),
     // Manos como guantes, a los lados y grandes: es la firma de aquel estilo y
     // además es lo único que deja ver a distancia qué está haciendo alguien.
     // Por eso el gesto vive en las manos y no en la cara.
     ...manosDelGesto(av.gesto, { px, pz, yTorso, altoTorso, yCabeza, ancho, piel, prefijo, indice, tiempo }),
     // Y lo que lleva encima, que es lo que dice la clase de un vistazo.
     ...distintivoDeClase(av.clase, { px, py: yTorso, pz, ancho, altoTorso, prefijo }),
-  ].map((pieza) => Object.freeze(pieza));
+  ];
 }
 
 /** Dónde queda la punta del cigarro en el mundo, junto a la boca. Un único
@@ -368,7 +374,7 @@ export function anclasHumoDeLaGente(gente = [], { omitirId = null } = {}) {
     const yCabeza = py + altoPiernas + altoTorso + altoCabeza / 2;
     const [hx, hy, hz] = puntaDelCigarro({ px, pz, yCabeza, ancho });
     anclas.push(
-      Object.freeze({ punto: [hx, hy, hz], tipo: "humo", largo: 1.4, indice }),
+      Object.freeze({ punto: [hx, hy, hz], tipo: "humo", largo: 1.4, indice })
     );
   }
   return anclas;

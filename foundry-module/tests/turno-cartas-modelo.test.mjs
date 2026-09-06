@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { combinarTarjetas, galeriaDePrueba, normalizarTarjeta, tarjetaSvg } from "../scripts/turno-cartas-modelo.mjs";
+import { combinarTarjetas, galeriaDePrueba, normalizarTarjeta, tarjetaSvg, tarjetasDeIniciativa } from "../scripts/turno-cartas-modelo.mjs";
 
 test("combina raza, clase, bando y estado en capas visuales", () => {
   const carta = normalizarTarjeta({ id: "a", nombre: "Alda", raza: "elfo", clase: "mago", bando: "aliado", shiny: true, estados: ["ventaja", "concentracion"] });
@@ -56,4 +56,15 @@ test("el agotamiento cero no crea badge ni altera shiny", () => {
   assert.deepEqual(carta.badges, []);
   assert.equal(carta.shiny, true);
   assert.doesNotMatch(tarjetaSvg(carta), /E0\/6/);
+});
+
+test("marca activo y siguiente sin cambiar la identidad de las cartas", () => {
+  const cartas = tarjetasDeIniciativa([
+    { id: "a", nombre: "Alda", raza: "elfo", clase: "mago" },
+    { id: "b", nombre: "Borin", raza: "enano", clase: "guerrero" },
+  ], { activoId: "b", siguienteId: "a" });
+  assert.equal(cartas[0].siguiente, true);
+  assert.equal(cartas[1].activo, true);
+  assert.equal(cartas[1].posicion, 1);
+  assert.equal(cartas[0].id, "a");
 });

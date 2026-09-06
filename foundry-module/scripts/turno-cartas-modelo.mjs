@@ -78,6 +78,18 @@ export function galeriaDePrueba() {
   })));
 }
 
+export function tarjetasDeIniciativa(participantes, { activoId = null, siguienteId = null } = {}) {
+  return participantes.map((participante, indice) => {
+    const carta = normalizarTarjeta(participante);
+    return Object.freeze({
+      ...carta,
+      posicion: indice,
+      activo: carta.id === activoId,
+      siguiente: carta.id === siguienteId,
+    });
+  });
+}
+
 function escapar(valor) {
   return String(valor).replace(/[&<>\"]/g, (caracter) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[caracter]));
 }

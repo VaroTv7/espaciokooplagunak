@@ -41,6 +41,7 @@ function metadatosDeCombatiente(payload = {}) {
   return {
     race: typeof payload.race === 'string' ? payload.race : null,
     className: typeof payload.className === 'string' ? payload.className : null,
+    bando: ['aliado', 'enemigo', 'neutral'].includes(payload.bando) ? payload.bando : null,
     shiny: payload.shiny === true,
     statuses: Object.freeze(estados),
     inspiration: payload.inspiration === true,

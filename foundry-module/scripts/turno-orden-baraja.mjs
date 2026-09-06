@@ -159,9 +159,9 @@ function svg(rects, fondo) {
  */
 export function generarCartaCombate(combatant, datosCampania = new Map(), estadoCombate = new Map()) {
   const rects = [];
-  const { id, iniciativa, ally } = combatant;
-  // Tipo de combatant: A (aliado), E (enemigo), N (neutral) - por ahora solo A o E
-  const tipo = ally ? 'A' : 'E';
+  const { id, initiative, ally, bando } = combatant;
+  const iniciativa = Number.isFinite(initiative) ? initiative : 0;
+  const tipo = bando === 'neutral' ? 'N' : (ally ? 'A' : 'E');
 
   // Fondo de la carta
   // No dibujamos el fondo aquí porque lo hará la función svg con el parámetro fondo.
@@ -312,25 +312,14 @@ export function generarBarajaTurnos(estadoTurno, datosCampania = new Map(), esta
     // Vamos a crear una función que dado un combatant y un desplazamiento (dx, dy) devuelva los rects de la carta.
     // Pero vamos a hacerlo en otro momento. Por ahora, vamos a asumir que el testing fallará y lo ajustaremos luego.
 
-    // Por ahora, vamos a dibujar un rectángulo de placeholder para cada carta para ver la disposición.
-    rects.push({ x, y, width: ANCHO, height: ALTO, color: '#ff0000' }); // rojo para ver
-    // Dibujar un número de carta para identificar
-    // Vamos a dibujar el índice de la carta en texto pixel pequeño
-    const indiceStr = String(idx + 1);
-    let offsetX = x + 5;
-    for (const c of indiceStr) {
-      const glifo = GLIFOS[c] || GLIFOS['?'];
-      estampar(rects, glifo, offsetX, y + 5, '#000000');
-      offsetX += 6;
-    }
-    // Dibujar un punto verde si es el turno actual
-    if (idx === currentIndex && active) {
-      rects.push({ x: x + 5, y: y + ALTO - 5, width: 2, height: 2, color: '#00ff00' });
-    }
+    const destacado = idx === currentIndex && active
+      ? `<rect x="1" y="1" width="${ANCHO - 2}" height="${ALTO - 2}" fill="none" stroke="${PALETA.destacado}" stroke-width="2"/>`
+      : '';
+    rects.push(`<g transform="translate(${x} ${y})">${contenido}${destacado}</g>`);
   });
 
   // Devolver el SVG de la baraja completa
-  return svg(rects, PALETA.fondo);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${anchoTotal} ${altoTotal}" shape-rendering="crispEdges" role="img">${rects.join('')}</svg>`;
 }
 
 // Exportar también el reducer y el estado inicial por si se necesitan

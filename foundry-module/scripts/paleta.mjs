@@ -556,6 +556,10 @@ export const BOSQUE = Object.freeze({
   // tiene que ser una línea un punto más clara y solo un punto.
   suelo: "#4e5c34", // hierba pisada de claro
   sueloClaro: "#57663a", // la franja de al lado, apenas un punto por encima
+  // El terreno de más allá de la linde. Más apagado y más frío que el claro: es
+  // el mismo bosque visto a través de aire, que es lo que hace la perspectiva
+  // aérea antes incluso de que entre la niebla del motor.
+  lejania: "#46543a",
   seco: "#8a7b52", // ramas muertas y helecho pasado: rompe el verde continuo
   tocon: "#6a563d", // el corte de un tronco caído, más claro que su corteza
 });

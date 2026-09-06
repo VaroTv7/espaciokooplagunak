@@ -460,6 +460,32 @@ export const VOCABULARIO_BOSQUE = definirVocabulario({
   },
 
   /**
+   * Árbol LEJANO: el mismo árbol con la mitad de caras, para el fondo.
+   *
+   * No es un árbol distinto ni un árbol más pequeño — es el mismo, dibujado con
+   * menos. A veinte metros no se distingue la banda de tronco iluminada ni los
+   * tres pisos de copa: lo que llega es una silueta y un tono. Mantener ahí el
+   * árbol completo cuesta 43 caras por pieza para no enseñar ninguna de ellas.
+   *
+   * Cinco lados en vez de ocho y dos pisos de copa en vez de tres: sigue
+   * leyéndose redondo contra el cielo, que es todo lo que tiene que hacer.
+   *
+   * La regla de cuándo usar cuál es de quien coloca, no de aquí: la linde que
+   * cierra el paso lleva el árbol entero porque se mira de cerca; los anillos
+   * de fondo llevan este.
+   */
+  "arbol-lejano": {
+    color: BOSQUE.tronco,
+    material: "veta",
+    partes: [
+      { medidas: [0.42, 2.3, 0.42], centro: [0, 1.15, 0], lados: 5, eje: "y", punta: 0.62 },
+      { medidas: [2.5, 1.5, 2.5], centro: [0, 2.5, 0], lados: 5, eje: "y", punta: 0.7, color: BOSQUE.follajeSombra },
+      { medidas: [1.8, 1.3, 1.8], centro: [0, 3.5, 0], lados: 5, eje: "y", punta: 0.3, color: BOSQUE.follaje },
+    ],
+    ancla: null,
+  },
+
+  /**
    * Tocón: el corte de un árbol caído, con una raíz asomando.
    *
    * Lo que hace que una arboleda no parezca plantada ayer. Y en el suelo cumple

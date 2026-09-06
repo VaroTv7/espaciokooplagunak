@@ -73,6 +73,19 @@ test("la gramática PSX usa mallas octogonales y volúmenes estrechados", () => 
   assert.notEqual(radio(0), radio(8), "el torso conserva lados paralelos");
 });
 
+test("la malla conserva ancho y fondo declarados por raza", () => {
+  const torso = (raza) => piezasAvatar({ raza }, { pies: [0, 0, 0] }).find((pieza) => pieza.nombre.endsWith("Torso"));
+  const extension = (pieza, eje) => {
+    const valores = pieza.malla.vertices.map((vertice) => vertice[eje]);
+    return Math.max(...valores) - Math.min(...valores);
+  };
+  const humano = torso("humano");
+  const enano = torso("enano");
+  assert.ok(extension(humano, 0) > 0.2, "el ancho del torso no llega a la malla");
+  assert.ok(extension(humano, 2) > 0.15, "el fondo del torso no llega a la malla");
+  assert.ok(extension(enano, 0) > extension(humano, 0), "el ancho del enano no llega a la malla");
+});
+
 test("la raza rompe la silueta además de cambiar proporciones", () => {
   const nombres = (raza) => piezasAvatar({ raza }, { pies: [0, 0, 0] }).map((pieza) => pieza.nombre);
   assert.ok(nombres("enano").some((nombre) => nombre.endsWith("Barba")));

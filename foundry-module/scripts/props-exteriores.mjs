@@ -431,6 +431,10 @@ export const VOCABULARIO_URBANO = definirVocabulario({
  * que el sitio ya tendría. Con árbol, tocón y helecho se hace una linde que se
  * densifica hacia fuera; con una nube pintada, no.
  */
+/** Las tres iteraciones de árbol normal, para repartirlas por rotación en vez
+ *  de plantar siempre la misma clave. */
+export const VARIANTES_ARBOL = Object.freeze(["arbol", "arbol-b", "arbol-c"]);
+
 export const VOCABULARIO_BOSQUE = definirVocabulario({
 
   /**
@@ -447,14 +451,90 @@ export const VOCABULARIO_BOSQUE = definirVocabulario({
   arbol: {
     color: BOSQUE.tronco,
     material: "veta",
+    // Más alto que la versión de #757 (5,2 m de copa, no 4,35) y con dos ramas
+    // que asoman del tronco antes de la copa: sin ellas la transición de
+    // tronco recto a fronda esférica es demasiado limpia para un árbol de
+    // verdad, que siempre tiene algo rompiendo esa línea.
     partes: [
-      { medidas: [0.42, 2.3, 0.42], centro: [0, 1.15, 0], lados: 8, eje: "y", punta: 0.62 },
+      { medidas: [0.42, 2.9, 0.42], centro: [0, 1.45, 0], lados: 8, eje: "y", punta: 0.6 },
       // La banda de tronco que coge luz, un poco más arriba y a un lado: sin
       // ella el tronco es una silueta plana contra la copa.
-      { medidas: [0.2, 1.4, 0.2], centro: [0.14, 0.9, 0.12], lados: 6, eje: "y", punta: 0.7, color: BOSQUE.troncoSol },
-      { medidas: [2.5, 1.1, 2.5], centro: [0, 2.5, 0], lados: 8, eje: "y", punta: 0.72, color: BOSQUE.follajeSombra },
-      { medidas: [2.1, 1.0, 2.1], centro: [0, 3.2, 0], lados: 8, eje: "y", punta: 0.6, color: BOSQUE.follaje },
-      { medidas: [1.4, 0.9, 1.4], centro: [0, 3.9, 0], lados: 8, eje: "y", punta: 0.25, color: BOSQUE.follajeSol },
+      { medidas: [0.2, 1.7, 0.2], centro: [0.14, 1.1, 0.12], lados: 6, eje: "y", punta: 0.68, color: BOSQUE.troncoSol },
+      // Dos ramas bajas, cada una con su propio penacho: es lo que rompe la
+      // silueta de "palo con una bola encima" antes de llegar a la copa.
+      { medidas: [0.11, 0.85, 0.11], centro: [0.5, 2.15, 0.1], lados: 5, eje: "x", punta: 0.4 },
+      { medidas: [0.85, 0.6, 0.85], centro: [0.82, 2.5, 0.16], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follajeSombra },
+      { medidas: [0.1, 0.7, 0.1], centro: [-0.45, 2.35, -0.22], lados: 5, eje: "x", punta: 0.4 },
+      { medidas: [0.72, 0.5, 0.72], centro: [-0.72, 2.65, -0.34], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follaje },
+      { medidas: [2.6, 1.2, 2.6], centro: [0, 3.1, 0], lados: 8, eje: "y", punta: 0.7, color: BOSQUE.follajeSombra },
+      { medidas: [2.2, 1.1, 2.2], centro: [0, 3.9, 0], lados: 8, eje: "y", punta: 0.58, color: BOSQUE.follaje },
+      { medidas: [1.5, 1.0, 1.5], centro: [0, 4.65, 0], lados: 8, eje: "y", punta: 0.24, color: BOSQUE.follajeSol },
+    ],
+    ancla: null,
+  },
+
+  /**
+   * Dos iteraciones simples de `arbol`, para que una arboleda no se vea como el
+   * mismo árbol clonado doscientas veces. La diferencia es la que un árbol de
+   * verdad tiene con otro de su misma especie: una rama de menos, la copa un
+   * punto más alta o más ancha — no una silueta distinta.
+   */
+  "arbol-b": {
+    color: BOSQUE.tronco,
+    material: "veta",
+    partes: [
+      { medidas: [0.42, 2.9, 0.42], centro: [0, 1.45, 0], lados: 8, eje: "y", punta: 0.6 },
+      { medidas: [0.2, 1.7, 0.2], centro: [0.14, 1.1, 0.12], lados: 6, eje: "y", punta: 0.68, color: BOSQUE.troncoSol },
+      // Solo la rama derecha, y algo más arriba que en `arbol`.
+      { medidas: [0.11, 0.9, 0.11], centro: [0.48, 2.45, -0.14], lados: 5, eje: "x", punta: 0.4 },
+      { medidas: [0.9, 0.62, 0.9], centro: [0.8, 2.82, -0.22], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follajeSombra },
+      { medidas: [2.35, 1.15, 2.35], centro: [0, 3.3, 0], lados: 8, eje: "y", punta: 0.7, color: BOSQUE.follajeSombra },
+      { medidas: [1.95, 1.05, 1.95], centro: [0, 4.05, 0], lados: 8, eje: "y", punta: 0.56, color: BOSQUE.follaje },
+      { medidas: [1.3, 0.95, 1.3], centro: [0, 4.75, 0], lados: 8, eje: "y", punta: 0.24, color: BOSQUE.follajeSol },
+    ],
+    ancla: null,
+  },
+  "arbol-c": {
+    color: BOSQUE.tronco,
+    material: "veta",
+    partes: [
+      { medidas: [0.42, 2.7, 0.42], centro: [0, 1.35, 0], lados: 8, eje: "y", punta: 0.6 },
+      { medidas: [0.2, 1.6, 0.2], centro: [0.14, 1.05, 0.12], lados: 6, eje: "y", punta: 0.68, color: BOSQUE.troncoSol },
+      // Solo la rama izquierda, y la copa un pelo más ancha y más baja que en
+      // `arbol`: un árbol viejo que ha crecido más a lo ancho que a lo alto.
+      { medidas: [0.1, 0.65, 0.1], centro: [-0.42, 2.05, -0.2], lados: 5, eje: "x", punta: 0.4 },
+      { medidas: [0.68, 0.48, 0.68], centro: [-0.68, 2.32, -0.32], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follaje },
+      { medidas: [2.85, 1.1, 2.85], centro: [0, 2.9, 0], lados: 8, eje: "y", punta: 0.72, color: BOSQUE.follajeSombra },
+      { medidas: [2.35, 1.0, 2.35], centro: [0, 3.65, 0], lados: 8, eje: "y", punta: 0.6, color: BOSQUE.follaje },
+      { medidas: [1.5, 0.85, 1.5], centro: [0, 4.35, 0], lados: 8, eje: "y", punta: 0.26, color: BOSQUE.follajeSol },
+    ],
+    ancla: null,
+  },
+
+  /**
+   * Árbol GRANDE: el veterano del claro, con la copa ancha de verdad.
+   *
+   * No es el árbol normal escalado — escalar un tronco de 0,42 m a lo bestia lo
+   * deja pareciendo un poste de teléfono. Este tiene su propia proporción:
+   * tronco más grueso en relación a su altura, copa mucho más ancha (4,6 m de
+   * diámetro, para que ocupe de verdad el par de casillas que se le da como
+   * obstáculo) y tres ramas en vez de dos.
+   */
+  "arbol-grande": {
+    color: BOSQUE.tronco,
+    material: "veta",
+    partes: [
+      { medidas: [0.7, 3.6, 0.7], centro: [0, 1.8, 0], lados: 8, eje: "y", punta: 0.66 },
+      { medidas: [0.3, 2.1, 0.3], centro: [0.2, 1.4, 0.16], lados: 6, eje: "y", punta: 0.72, color: BOSQUE.troncoSol },
+      { medidas: [0.16, 1.15, 0.16], centro: [0.75, 2.75, 0.15], lados: 5, eje: "x", punta: 0.42 },
+      { medidas: [1.15, 0.8, 1.15], centro: [1.25, 3.25, 0.24], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follajeSombra },
+      { medidas: [0.15, 1.0, 0.15], centro: [-0.68, 2.9, -0.3], lados: 5, eje: "x", punta: 0.42 },
+      { medidas: [1.0, 0.7, 1.0], centro: [-1.05, 3.35, -0.46], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follaje },
+      { medidas: [0.14, 0.9, 0.14], centro: [-0.1, 2.7, 0.62], lados: 5, eje: "z", punta: 0.42 },
+      { medidas: [0.9, 0.65, 0.9], centro: [-0.16, 3.15, 1.0], lados: 6, eje: "y", punta: 0.6, color: BOSQUE.follajeSombra },
+      { medidas: [4.2, 1.7, 4.2], centro: [0, 4.05, 0], lados: 10, eje: "y", punta: 0.7, color: BOSQUE.follajeSombra },
+      { medidas: [3.5, 1.5, 3.5], centro: [0, 5.15, 0], lados: 10, eje: "y", punta: 0.56, color: BOSQUE.follaje },
+      { medidas: [2.3, 1.3, 2.3], centro: [0, 6.1, 0], lados: 8, eje: "y", punta: 0.22, color: BOSQUE.follajeSol },
     ],
     ancla: null,
   },

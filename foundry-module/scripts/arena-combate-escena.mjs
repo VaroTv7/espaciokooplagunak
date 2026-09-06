@@ -41,24 +41,35 @@
 // como salieron del escaneo — y decirlo aquí es preferible a que la cabecera
 // prometa una pose que el código no hace.
 //
-// EL PRESUPUESTO, MEDIDO. Peor rumbo desde la entrada —el encuadre más caro,
-// mirando los 45 m a lo largo con los cuatro combatientes delante—: 1905
-// polígonos y 25,4 ms. Desde el centro del claro, 1358 y 16,2 ms. El punto de
-// comparación no son las salas de la nave (4,2 ms la peor) sino el otro
-// exterior del módulo: la playa cuesta 35,6 ms con 865 polígonos, o sea que
-// esto sale más barato que lo que ya hay pese a dibujar el doble. Un interior y
-// un exterior no se miden con la misma vara, y confundirlos hace sonar una
-// alarma donde no la hay.
+// EL PRESUPUESTO, MEDIDO — segunda pasada, tras añadir árboles más ramificados,
+// cuatro árboles DENTRO del claro, maleza de helechos y fauna animada
+// (insectos, hojas, algún pájaro). Peor rumbo desde la entrada —mirando los
+// 45 m a lo largo, con la linde a ambos lados y los cuatro combatientes
+// delante—: 2065 polígonos y 44,2 ms. Desde el centro del claro, 27 ms; junto
+// al árbol grande, 32 ms. El punto de comparación sigue siendo el otro
+// exterior del módulo: la playa cuesta 35,6 ms. Esta vez SÍ queda por encima,
+// y solo en ese único punto de vista más caro — en el resto del claro va por
+// debajo. Se deja así, medido y dicho, en vez de perseguir la paridad exacta
+// con la playa: la densidad que se pidió (más árboles, más ramas, maleza,
+// fauna) tiene un coste real, y fingir que no lo tiene sería peor que
+// declararlo.
 //
-// De dónde sale ese coste, por si algún día hay que recortar: los cuatro
+// UN FALLO SILENCIOSO QUE SÍ SE ARREGLÓ: la maleza sembraba helechos en las
+// dos casillas de la entrada, y una pieza de medio metro a metro y medio de la
+// cámara ocupa media pantalla — no una anomalía, geometría correcta vista de
+// cerca. `malezaDelSuelo` excluye ahora la fila de aparición.
+//
+// De dónde sale el coste, por si algún día hay que recortar más: los cuatro
 // combatientes son ~9 ms ellos solos (mallas de escaneo, 900 caras cada una);
-// el resto es arbolado. Las tres palancas ya usadas, en orden de lo que dieron:
-// bajar el alcance de dibujo de 420 m a 110 —en un claro no se ve a 420 m—,
-// descartar por rumbo y distancia ANTES de llamar al motor, y una variante
-// `arbol-lejano` de la mitad de caras para los anillos de fondo. La que queda
-// sin usar es decimar las mallas de los combatientes: son placeholders y a
-// distancia de combate no necesitan 900 caras, pero eso es un paso de
-// herramienta, no algo que hacer en caliente.
+// la linde y el bosque de fondo son el grueso del resto —más ahora que cada
+// "arbol" lleva dos ramas propias—. Las palancas ya usadas: alcance de dibujo
+// de 60 m en vez de 420 (a esa distancia la niebla ya lo funde todo), descarte
+// por rumbo y distancia ANTES de llamar al motor, y `arbol-lejano` para el
+// bosque de fondo. La maleza y la fauna, ya recortadas una vez cada una
+// (helechos de 1 en 6 casillas a 1 en 25; la fauna se autodescarta por
+// distancia antes de construir su malla), pesan poco por sí solas. Sin usar
+// queda decimar las mallas de los combatientes — son placeholders, y eso es
+// un paso de herramienta, no algo para hacer en caliente.
 //
 // Puro y sin color propio (#351): los colores salen de `BOSQUE` y `MUSEO` en
 // `paleta.mjs`.
@@ -70,11 +81,13 @@ import { resolverCamara } from "./nave-camara.mjs";
 import { poligonosOtrosJugadores } from "./nave-avatares-render.mjs";
 import { crearPlanta } from "./nave-movimiento.mjs";
 import { colocarProp, mezclarVocabularios } from "./nave-props.mjs";
-import { VOCABULARIO_BOSQUE, VOCABULARIO_COSTA } from "./props-exteriores.mjs";
+import { VARIANTES_ARBOL, VOCABULARIO_BOSQUE, VOCABULARIO_COSTA } from "./props-exteriores.mjs";
 import { declararInteracciones } from "./nave-interaccion.mjs";
-import { declararSol, franja, huellaDe } from "./escena-exteriores.mjs";
+import { ciclo, declararSol, franja, huellaDe } from "./escena-exteriores.mjs";
+import { rngSemilla } from "./ventana-nave.mjs";
 import { piezasHorizonte, texturasHorizonte } from "./horizonte-matte.mjs";
 import { GRID_UNIT_FT } from "./pathfinding-core.mjs";
+import { claveCasilla } from "./combate-rejilla.mjs";
 import { DORIFORO } from "../data/mallas/doriforo.mjs";
 import { HERAKLES_FARNESE } from "../data/mallas/herakles-farnese.mjs";
 import { VENUS_DE_MILO } from "../data/mallas/venus-de-milo.mjs";
@@ -120,7 +133,7 @@ const AMBIENTE_EXTERIOR = 0.78;
  * —los que la niebla ya había fundido con el cielo— llevó el peor rumbo de 49 ms
  * a lo que dice la cabecera de abajo, sin que el horizonte se abra.
  */
-const ALCANCE = 110;
+const ALCANCE = 60;
 const ALCANCE_CIELO = 4000;
 const TEXTURAS_MATTE = texturasHorizonte();
 
@@ -259,6 +272,90 @@ function huellasCombatientes() {
   });
 }
 
+/* ---- árboles dentro de la arena --------------------------------------------- */
+
+/**
+ * Árboles DENTRO del claro y no solo en su borde: cuatro, uno grande ocupando
+ * un bloque de 2×2 casillas y tres normales bien repartidos. Alejados entre sí
+ * y de los combatientes de sobra para que ninguno tape una línea de visión
+ * entera ni se confunda con un obstáculo puesto para una emboscada.
+ *
+ * En CASILLAS, como los combatientes: la escena es quien traduce a metros.
+ */
+const ARBOLES_INTERIORES = Object.freeze([
+  Object.freeze({ clave: "arbol-grande", col: 15, fila: 14, ocupa: 2 }),
+  Object.freeze({ clave: "arbol-b", col: 5, fila: 4, ocupa: 1 }),
+  Object.freeze({ clave: "arbol-c", col: 25, fila: 5, ocupa: 1 }),
+  Object.freeze({ clave: "arbol", col: 6, fila: 17, ocupa: 1 }),
+]);
+
+function piezasArbolesInteriores(cierre) {
+  // Solo en la arboleda: una mazmorra no tiene árboles creciendo en la sala.
+  if (cierre.id !== "arboleda") return [];
+  return ARBOLES_INTERIORES.flatMap(({ clave, col, fila, ocupa }) => {
+    // El centro de un árbol de 2×2 cae en la esquina que comparten sus cuatro
+    // casillas, no en el centro de una de ellas.
+    const cx = (col + ocupa / 2) * LADO_CASILLA;
+    const cz = (fila + ocupa / 2) * LADO_CASILLA;
+    return [colocarProp(clave, { x: cx, z: cz, cuartos: 0, nombre: `interior-${col}-${fila}`, vocabulario: VOCABULARIO_ARENA })];
+  });
+}
+
+/** El bloque de casillas que cada árbol interior bloquea al andar. */
+function huellasArbolesInteriores(cierre) {
+  if (cierre.id !== "arboleda") return [];
+  return ARBOLES_INTERIORES.map(({ col, fila, ocupa }) => ({
+    x: col * LADO_CASILLA,
+    z: fila * LADO_CASILLA,
+    ancho: ocupa * LADO_CASILLA,
+    profundidad: ocupa * LADO_CASILLA,
+  }));
+}
+
+/* ---- maleza del suelo -------------------------------------------------------- */
+
+/**
+ * Helechos sueltos por el claro jugable, no solo en la linde.
+ *
+ * Deliberadamente disperso y no denso: esto es hierba alta rompiendo el plano
+ * del suelo, no sotobosque — un claro de combate tiene que seguir leyéndose
+ * caminable de un vistazo, que es justo lo que la linde (mucho más tupida) no
+ * necesita respetar. Nunca sobre una casilla ocupada por un obstáculo, un
+ * árbol interior o un combatiente: la maleza decora el suelo, no lo esconde.
+ */
+function malezaDelSuelo(cierre) {
+  if (cierre.id !== "arboleda") return [];
+  const ocupadas = new Set(COMBATIENTES.map((k) => claveCasilla(k.x, k.y)));
+  for (const { col, fila, ocupa } of ARBOLES_INTERIORES) {
+    for (let dc = 0; dc < ocupa; dc += 1) for (let df = 0; df < ocupa; df += 1) ocupadas.add(claveCasilla(col + dc, fila + df));
+  }
+  const rng = rngSemilla(0x4d414c45);
+  const piezas = [];
+  // MEDIDO: una de cada seis casillas (80 helechos, 28 caras cada uno) subía el
+  // peor rumbo de 25 a 90 ms — más que todo lo demás junto. Una de cada
+  // veinticinco sigue leyéndose como suelo roto sin dejar de caber en el
+  // presupuesto de un exterior (ver la cabecera de más abajo).
+  //
+  // SIN LAS DOS FILAS DE LA ENTRADA. Un helecho a metro y medio de la cámara
+  // ocupa media pantalla —es geometría de medio metro vista de cerca, no un
+  // fallo de escala— y lo primero que se vería al entrar sería una mata negra
+  // tapando la arena entera. Lo mismo vale para cualquier punto de aparición:
+  // el suelo cede alrededor de donde se llega.
+  const filaEntrada = Math.floor(ENTRADA.z / LADO_CASILLA);
+  for (let f = 1; f < CASILLAS_FONDO - 1; f += 1) {
+    if (Math.abs(f - filaEntrada) <= 1) continue;
+    for (let c = 1; c < CASILLAS_ANCHO - 1; c += 1) {
+      if (ocupadas.has(claveCasilla(c, f))) continue;
+      if (rng() > 0.04) continue;
+      const [cx, cz] = centroDeCasilla(c, f);
+      const x = cx + (rng() - 0.5) * LADO_CASILLA * 0.6;
+      const z = cz + (rng() - 0.5) * LADO_CASILLA * 0.6;
+      piezas.push(colocarProp("helecho", { x, z, cuartos: Math.floor(rng() * 4), nombre: `maleza-${c}-${f}`, vocabulario: VOCABULARIO_ARENA }));
+    }
+  }
+  return piezas;
+}
+
 /* ---- el suelo -------------------------------------------------------------- */
 
 /**
@@ -352,11 +449,16 @@ function lindeAlrededor(cierre) {
   };
   let n = 0;
   const colocar = (x, z, dentroFuera) => {
-    const clave = cierre.linde[Math.floor(rng(n) * cierre.linde.length) % cierre.linde.length];
+    let clave = cierre.linde[Math.floor(rng(n) * cierre.linde.length) % cierre.linde.length];
     n += 1;
     // La fila de fuera solo lleva lo que TAPA: un helecho a un paso por detrás
     // de otro helecho no cierra nada.
     if (dentroFuera === "fuera" && (clave === "helecho" || clave === "tocon")) return;
+    // "arbol" no es una clave de verdad: es la señal de "pon un árbol normal",
+    // y cuál de las tres iteraciones toca se decide aquí — así una arboleda no
+    // es el mismo árbol clonado en cada hueco de la linde.
+    if (clave === "arbol") clave = VARIANTES_ARBOL[Math.floor(rng(n) * VARIANTES_ARBOL.length)];
+    n += 1;
     const cuartos = Math.floor(rng(n) * 4);
     n += 1;
     piezas.push(colocarProp(clave, { x, z, cuartos, nombre: `linde-${piezas.length}`, vocabulario: VOCABULARIO_ARENA }));
@@ -402,10 +504,12 @@ function bosqueDeFondo(cierre) {
   // enteros y no se distinguían. Es el recorte que manda la regla de la casa
   // cuando el presupuesto no da: baja la densidad de lo anecdótico, nunca la
   // resolución de lo que se mira de cerca.
+  // Con 60 m de alcance, un árbol más allá de la distancia media ya cae en la
+  // niebla casi entera: el tercer anillo de antes (26 m más allá del borde) se
+  // pagaba entero para enseñar un borrón. Dos anillos, más juntos.
   const anillos = [
-    { distancia: 9, paso: 6.5 },
-    { distancia: 16, paso: 9 },
-    { distancia: 26, paso: 13 },
+    { distancia: 6, paso: 7 },
+    { distancia: 13, paso: 10 },
   ];
   for (const { distancia, paso } of anillos) {
     const x0 = -distancia, x1 = ANCHO + distancia;
@@ -429,10 +533,98 @@ function bosqueDeFondo(cierre) {
   return piezas;
 }
 
+/* ---- vida en el claro -------------------------------------------------------
+ *
+ * Insectos, algún pájaro y hojas cayendo. Las tres funciones comparten una
+ * regla: NO se paga nada por lo que no puede verse. `visiblesDesde` ya
+ * descarta piezas fuera de rango o a la espalda; aquí el criterio adicional es
+ * la DISTANCIA a la cámara, calculada antes de construir ni un vértice —un
+ * insecto a 40 m no se distingue de un mosquito en el objetivo de la cámara, y
+ * construir su malla para tirarla en el recorte sería exactamente el fallo que
+ * `visiblesDesde` existe para evitar en el resto de la escena.
+ *
+ * Todas deterministas por semilla y por segundo, como `arenaVolando`/`oleaje`
+ * de la playa: no hay estado que arrastrar entre fotogramas, así que la misma
+ * captura del mismo instante da siempre el mismo resultado.
+ */
+
+const ALCANCE_INSECTOS = 9; // se leen solo de cerca: un punto de dos cm no llega más lejos
+const ALCANCE_HOJAS = 22;
+const ALCANCE_PAJAROS = 70; // siluetas grandes: se ven de lejos, y de lejos es donde deben estar
+
+/** Un puñado de insectos en vuelo errático, cerca del observador. */
+function insectosVolando(camara, segundos) {
+  const rng = rngSemilla(0x1e5ec70);
+  const [camX, , camZ] = camara;
+  const piezas = [];
+  for (let i = 0; i < 5; i += 1) {
+    const cx = ciclo(rng() * ANCHO, ANCHO);
+    const cz = ciclo(rng() * PROFUNDIDAD, PROFUNDIDAD);
+    if (Math.hypot(cx - camX, cz - camZ) > ALCANCE_INSECTOS) continue;
+    const fase = segundos * (2.2 + rng()) + i * 7.1;
+    const x = cx + Math.sin(fase) * 0.35;
+    const z = cz + Math.cos(fase * 1.3) * 0.35;
+    const y = 0.5 + rng() * 0.9 + Math.sin(fase * 2.1) * 0.12;
+    piezas.push({ malla: caja([x, y, z], [0.025, 0.025, 0.025]), color: BOSQUE.tronco });
+  }
+  return piezas;
+}
+
+/** Hojas cayendo, solo cerca de un árbol y solo cerca de la cámara. */
+function hojasCayendo(camara, segundos) {
+  const rng = rngSemilla(0x0eaf1a11);
+  const [camX, , camZ] = camara;
+  const origenes = [
+    ...ARBOLES_INTERIORES.map(({ col, fila, ocupa }) => centroDeCasilla(col + ocupa / 2 - 0.5, fila + ocupa / 2 - 0.5)),
+  ];
+  const piezas = [];
+  for (let i = 0; i < 10; i += 1) {
+    const [ox, oz] = origenes[i % origenes.length];
+    if (Math.hypot(ox - camX, oz - camZ) > ALCANCE_HOJAS) continue;
+    const duracion = 5 + rng() * 2;
+    const t = ciclo(segundos + rng() * duracion, duracion) / duracion; // 0 arriba, 1 en el suelo
+    const deriva = 0.6 + rng() * 0.5;
+    const x = ox + Math.sin(t * 6.3 + i) * deriva;
+    const z = oz + Math.cos(t * 5.1 + i) * deriva;
+    const y = 4.4 * (1 - t) + 0.05;
+    piezas.push({
+      malla: caja([x, y, z], [0.09, 0.01, 0.09]),
+      color: rng() > 0.5 ? BOSQUE.follaje : BOSQUE.seco,
+    });
+  }
+  return piezas;
+}
+
+/** Un pájaro, de tanto en tanto, cruzando el cielo lejos del claro. Silueta
+ *  plana de dos caras en V: de lejos no hace falta más para leerse como ave. */
+function pajarosLejanos(camara, segundos) {
+  const rng = rngSemilla(0xb1d0);
+  const [camX, , camZ] = camara;
+  const piezas = [];
+  for (let i = 0; i < 2; i += 1) {
+    const duracionCiclo = 26 + i * 9;
+    const fase = ciclo(segundos + i * 11, duracionCiclo) / duracionCiclo;
+    if (fase > 0.4) continue; // vuela solo un tramo del ciclo: no siempre hay uno cruzando
+    const recorrido = ALCANCE_PAJAROS * 1.6;
+    const x = camX - ALCANCE_PAJAROS * 0.7 + fase * recorrido / 0.4;
+    const z = camZ + (i === 0 ? -1 : 1) * (18 + rng() * 14);
+    const y = 14 + rng() * 6 + Math.sin(fase * 40) * 0.4; // el aleteo, apenas insinuado
+    const ala = 0.55;
+    piezas.push({
+      malla: {
+        vertices: [[x - ala, y, z], [x, y - 0.12, z], [x + ala, y, z], [x, y + 0.03, z]],
+        caras: [[0, 1, 3], [1, 2, 3]],
+      },
+      color: BOSQUE.tronco,
+    });
+  }
+  return piezas;
+}
+
 /* ---- la escena ------------------------------------------------------------- */
 
 function piezasDe(cierre) {
-  const linde = [...lindeAlrededor(cierre), ...bosqueDeFondo(cierre)];
+  const linde = [...lindeAlrededor(cierre), ...bosqueDeFondo(cierre), ...piezasArbolesInteriores(cierre), ...malezaDelSuelo(cierre)];
   const props = linde.flatMap(({ piezas }) =>
     piezas.map((pieza) => ({
       malla: pieza.malla ?? caja(pieza.centro, pieza.medidas),
@@ -557,7 +749,7 @@ function obstaculosDe(cierre) {
 export const PLANTA_ARENA = crearPlanta({
   ancho: ANCHO,
   profundidad: PROFUNDIDAD,
-  obstaculos: [...obstaculosDe(cierreDe(CIERRE_POR_DEFECTO)), ...huellasCombatientes()],
+  obstaculos: [...obstaculosDe(cierreDe(CIERRE_POR_DEFECTO)), ...huellasCombatientes(), ...huellasArbolesInteriores(cierreDe(CIERRE_POR_DEFECTO))],
 });
 
 /** Se entra por el borde corto, mirando al fondo: lo primero que se ve es la
@@ -614,7 +806,16 @@ export function componerArena(x, y, z, yaw, opciones = {}) {
 
   // El descarte, ANTES de tocar el motor: ver `visiblesDesde`.
   const enCuadro = visiblesDesde(piezasCacheadas(cierre), x, z, yaw);
-  const partes = [...horizonte, ...enCuadro].map(({ malla, color, emisivo, lejos, textura }) =>
+
+  // Lo que se mueve: recalculado cada fotograma a partir de `segundos`, nunca
+  // guardado. Las tres funciones ya descartan por distancia antes de construir
+  // una sola malla, así que lejos de todo esto cuesta tres llamadas a
+  // `Math.hypot` y nada más.
+  const vivo = cierre.id === "arboleda"
+    ? [...insectosVolando(camara, segundos), ...hojasCayendo(camara, segundos), ...pajarosLejanos(camara, segundos)]
+    : [];
+
+  const partes = [...horizonte, ...enCuadro, ...vivo].map(({ malla, color, emisivo, lejos, textura }) =>
     componerEscena(
       { ...malla, vertices: malla.vertices.map(([vx, vy, vz]) => [vx - camara[0], vy - camara[1], vz - camara[2]]) },
       {

@@ -25,8 +25,7 @@
  * Puro: ni Foundry, ni DOM, ni red, ni reloj.
  */
 
-import { caja } from "./cantina-escena.mjs";
-import { piezasAvatar } from "./cantina-avatar.mjs";
+import { piezasAvatarPSX } from "./avatar-psx.mjs";
 import { componerEscena } from "./retro3d.mjs";
 
 /**
@@ -39,15 +38,15 @@ import { componerEscena } from "./retro3d.mjs";
  *   andar.mjs` y `aNativo`). `avatar` es la descripción que ya consume
  *   `piezasAvatar`/`normalizarAvatar`; ausente se normaliza a un cuerpo
  *   genérico, nunca revienta por un jugador sin avatar elegido.
- * @param {{camara:[number,number,number], yaw:number, ancho:number,
+ * @param {{camara:[number,number,number], yaw:number, ancho:number,\n
  *   alto:number, epoca?:string, fov?:number}} opciones
- *   `camara` es la posición de cámara YA en el mismo espacio nativo que
- *   `jugadores` — la resta a cada jugador la hace este módulo, igual que la
- *   sala la resta a sus propios muebles antes de componer. `yaw` es el que
- *   la propia sala ya pasa a `componerEscena` para su geometría (con el
+ *   `camara` es la posición de cámara YA en el mismo espacio nativo que\n
+ *   `jugadores` — la resta a cada jugador la hace este módulo, igual que la\n
+ *   sala la resta a sus propios muebles antes de componer. `yaw` es el que\n
+ *   la propia sala ya pasa a `componerEscena` para su geometría (con el\n
  *   signo invertido de #427 ya aplicado por quien llama).
- * @returns {Array<object>} polígonos, mismo contrato que
- *   `componerEscena(...).poligonos` — listos para fundir con los de la sala
+ * @returns {Array<object>} polígonos, mismo contrato que\n
+ *   `componerEscena(...).poligonos` — listos para fundir con los de la sala\n
  *   y reordenar juntos por profundidad.
  */
 export function poligonosOtrosJugadores(jugadores, { camara, yaw, ancho, alto, epoca, fov }) {
@@ -55,7 +54,7 @@ export function poligonosOtrosJugadores(jugadores, { camara, yaw, ancho, alto, e
   const [camX, camY, camZ] = camara;
 
   const piezas = jugadores.flatMap((jugador, indice) =>
-    piezasAvatar(jugador?.avatar ?? {}, {
+    piezasAvatarPSX(jugador?.avatar ?? {}, {
       pies: [jugador.x - camX, jugador.y - camY, jugador.z - camZ],
       indice,
     }),
@@ -63,7 +62,7 @@ export function poligonosOtrosJugadores(jugadores, { camara, yaw, ancho, alto, e
 
   return piezas
     .map((pieza) =>
-      componerEscena(caja(pieza.centro, pieza.medidas), {
+      componerEscena({ vertices: pieza.vertices, caras: pieza.caras }, {
         ancho,
         alto,
         epoca,

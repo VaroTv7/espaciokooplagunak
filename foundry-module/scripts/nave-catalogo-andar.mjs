@@ -47,6 +47,7 @@ import {
   componerMuseo,
 } from "./museo-escena.mjs";
 import { MUSEO, PLAYA } from "./paleta.mjs";
+import { PLANTA_LIBRO, componerLibro, ENTRADA, INTERACCIONES } from "./libro-escena.mjs";
 import {
   ANCHO_PUERTA,
   GROSOR_PUERTA,
@@ -396,9 +397,24 @@ export const CATALOGO_ANDAR = crearCatalogoEstancias({
     entrada: ENTRADA_MUSEO,
     interacciones: INTERACCIONES_MUSEO,
     // Interior cerrado y sin ventanas: lo que asome por un hueco es más sala sin
-    // pintar, no el vacío. Su propio gris, y no el de mamparo, para que el borde
-    // de la sala no se lea como casco de nave.
-    fondo: MUSEO.zocalo,
-    puertas: [],
-  },
-});
+      // pintar, no el vacío. Su propio gris, y no el de mamparo, para que el borde
+      // de la sala no se lea como casco de nave.
+      fondo: MUSEO.zocalo,
+      puertas: [],
+      },
+      // La estancia del libro interactuable (#853). NO cuelga de ninguna puerta de la
+      // nave: el libro es un adorno independiente que se coloca en las escenas
+      // andables como elemento de ambientación. Se entra por la herramienta
+      // solo-GM de la barra de escena, y se vuelve por la salida.
+      libro: {
+        planta: PLANTA_LIBRO,
+        componer: componerLibro,
+        entrada: ENTRADA,
+        interacciones: INTERACCIONES,
+        // Interior cerrado y sin ventanas: lo que asome por un hueco es más sala sin
+        // pintar, no el vacío. Su propio gris, y no el de mamparo, para que el borde
+        // de la sala no se lea como casco de nave.
+        fondo: 0x808080, // gris pared
+        puertas: [],
+      },
+    });

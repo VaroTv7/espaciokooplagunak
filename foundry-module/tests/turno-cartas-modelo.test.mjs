@@ -75,11 +75,14 @@ test("proyecta el estado del reducer sin convertirlo en otra fuente de verdad", 
     currentIndex: 1,
     combatants: [
       { id: "a", name: "Alda", initiative: 12, ally: true },
-      { id: "b", name: "Borin", initiative: 8, ally: false },
+      { id: "b", name: "Borin", initiative: 8, ally: false, race: "enano", className: "guerrero", exhaustion: 2 },
     ],
   });
   assert.equal(cartas[0].bando, "aliado");
   assert.equal(cartas[1].bando, "enemigo");
   assert.equal(cartas[1].activo, true);
   assert.equal(cartas[0].siguiente, true);
+  assert.equal(cartas[1].raza, "enano");
+  assert.equal(cartas[1].clase, "guerrero");
+  assert.equal(cartas[1].agotamiento, 2);
 });

@@ -101,6 +101,12 @@ export function tarjetasDesdeEstadoTurno(estado) {
   return tarjetasDeIniciativa(combatientes.map((combatiente) => ({
     ...combatiente,
     nombre: combatiente.name,
+    raza: combatiente.race,
+    clase: combatiente.className,
+    shiny: combatiente.shiny,
+    estados: combatiente.statuses,
+    inspiracion: combatiente.inspiration,
+    agotamiento: combatiente.exhaustion,
     bando: combatiente.ally ? "aliado" : "enemigo",
   })), { activoId: actual?.id ?? null, siguienteId: siguiente?.id ?? null });
 }

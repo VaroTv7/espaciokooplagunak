@@ -105,6 +105,37 @@ export const ALTO_BASE = 1.72;
 /** Normaliza una descripción venga de donde venga, sin rechazar nada: un avatar
  * mal descrito tiene que aparecer igual, porque no aparecer es peor que
  * aparecer raro. */
+/**
+ * Una descripción de avatar a partir de texto suelto: `"enano,mago,brindis"`.
+ *
+ * Vive AQUÍ y no en quien la llama porque las listas válidas están aquí: un
+ * parseador que viva fuera tiene que importarlas o —peor— repetirlas, y una
+ * copia de la lista de clases es como se acaba aceptando una clase que el
+ * avatar no sabe dibujar.
+ *
+ * Orden libre, campos opcionales y sin distinguir mayúsculas: lo que no se
+ * reconozca se ignora y `normalizarAvatar` pone su valor por defecto. No
+ * revienta con basura a propósito — esto lee entrada de una URL o de una línea
+ * escrita a mano, donde una errata es lo normal y quedarse en el avatar
+ * genérico es una degradación aceptable.
+ */
+export function avatarDesdeTexto(texto) {
+  const partes = String(texto ?? "")
+    .split(",")
+    .map((trozo) => trozo.trim().toLowerCase())
+    .filter(Boolean);
+  const avatar = {};
+  for (const parte of partes) {
+    if (RAZAS.includes(parte)) avatar.raza = parte;
+    else if (CLASES.includes(parte)) avatar.clase = parte;
+    else if (GESTOS.includes(parte)) avatar.gesto = parte;
+    // Un número suelto es el color de ropa: es lo único del catálogo que no
+    // tiene nombre, solo índice.
+    else if (/^\d+$/.test(parte)) avatar.ropa = Number(parte);
+  }
+  return avatar;
+}
+
 export function normalizarAvatar(descripcion = {}) {
   const raza = RAZAS.includes(descripcion.raza) ? descripcion.raza : "humano";
   return {

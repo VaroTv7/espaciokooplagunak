@@ -20,6 +20,7 @@ import {
   normalizarAvatar,
   piezasAvatar,
   piezasDeLaGente,
+  avatarDesdeTexto,
 } from "../scripts/cantina-avatar.mjs";
 
 test("las doce clases del SRD 5.1 están, y solo esas", () => {
@@ -208,4 +209,32 @@ test("no hay gestos de cara, y es a propósito", () => {
     const piezas = piezasAvatar({ gesto }, { pies: [0, 0, 0] });
     assert.ok(!piezas.some((p) => /Ojo|Boca|Ceja/.test(p.nombre)), `${gesto} ha inventado una cara`);
   }
+});
+
+test("avatarDesdeTexto lee raza, clase y gesto en cualquier orden", () => {
+  assert.deepEqual(avatarDesdeTexto("enano,mago,brindis"), { raza: "enano", clase: "mago", gesto: "brindis" });
+  // El orden no importa: cada trozo se reconoce por a qué catálogo pertenece.
+  assert.deepEqual(avatarDesdeTexto("brindis, MAGO ,enano"), { raza: "enano", clase: "mago", gesto: "brindis" });
+});
+
+test("avatarDesdeTexto ignora lo que no reconoce en vez de reventar", () => {
+  // Lee de una URL escrita a mano: una errata tiene que degradar al avatar
+  // genérico, no tirar la escena entera.
+  assert.deepEqual(avatarDesdeTexto("dragonborn,ninja"), {});
+  assert.deepEqual(avatarDesdeTexto(""), {});
+  assert.deepEqual(avatarDesdeTexto(null), {});
+  assert.deepEqual(avatarDesdeTexto(undefined), {});
+});
+
+test("avatarDesdeTexto toma un número suelto como color de ropa", () => {
+  assert.deepEqual(avatarDesdeTexto("elfo,3"), { raza: "elfo", ropa: 3 });
+});
+
+test("lo que sale de avatarDesdeTexto lo entiende normalizarAvatar", () => {
+  // La pareja tiene que cerrar: si el parseador emitiera una clave que el
+  // normalizador no conoce, el avatar saldría por defecto sin que nadie avise.
+  const av = normalizarAvatar(avatarDesdeTexto("mediano,picaro,fumar"));
+  assert.equal(av.raza, "mediano");
+  assert.equal(av.clase, "picaro");
+  assert.equal(av.gesto, "fumar");
 });

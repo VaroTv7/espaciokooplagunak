@@ -221,27 +221,39 @@ export function generarCartaCombate(combatant, datosCampania = new Map(), estado
   }
 
   // Dibujar iconos de estado de combate en la esquina inferior derecha
-  const estado = estadoCombate.get(id) || {};
+  const estado = { ...(estadoCombate.get(id) || {}), ...(combatant.statuses ? { statuses: combatant.statuses } : {}) };
+  const tieneEstado = (nombre) => estado[nombre] === true || estado.statuses?.includes(nombre);
   let offsetXIcono = ANCHO - 20; // empezamos desde la derecha
   const escalaIcono = 2; // hacer los iconos 10x10
-  if (estado.herido) {
+  if (tieneEstado('herido')) {
     estamparIcono(rects, ICONO_HERIDO, offsetXIcono, ALTO - 20, PALETA.herido, escalaIcono);
     offsetXIcono -= 6 * escalaIcono; // espacio entre iconos
   }
-  if (estado.ventaja) {
+  if (tieneEstado('ventaja')) {
     estamparIcono(rects, ICONO_VENTAJA, offsetXIcono, ALTO - 20, PALETA.ventaja, escalaIcono);
     offsetXIcono -= 6 * escalaIcono;
   }
-  if (estado.concentracionRota) {
+  if (tieneEstado('concentracion') || estado.concentracionRota) {
     estamparIcono(rects, ICONO_CONCENTRACION, offsetXIcono, ALTO - 20, PALETA.concentracion, escalaIcono);
     offsetXIcono -= 6 * escalaIcono;
   }
-  if (estado.muerto) {
+  if (tieneEstado('muerto')) {
     estamparIcono(rects, ICONO_MUERTO, offsetXIcono, ALTO - 20, PALETA.muerto, escalaIcono);
   }
 
-  // Devolver la carta como SVG
-  return svg(rects, PALETA.fondo);
+  // Las capas de campaña y de identidad también son visibles: no quedan como
+  // metadatos muertos aunque el layout definitivo se decida en #1031.
+  const niveles = Number.isInteger(combatant.exhaustion) ? Math.max(0, Math.min(6, combatant.exhaustion)) : 0;
+  const estados = Array.isArray(combatant.statuses) ? combatant.statuses.join(',') : '';
+  const titulo = [combatant.name, combatant.race, combatant.className, combatant.shiny ? 'shiny' : '', combatant.inspiration ? 'inspiracion' : '', estados, niveles ? `agotamiento-${niveles}` : ''].filter(Boolean).join(' · ');
+  const escapar = (valor) => String(valor).replace(/[&<>\"]/g, (caracter) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[caracter]));
+  const decoracion = [
+    `<title>${escapar(titulo)}</title>`,
+    combatant.shiny ? `<rect x="2" y="2" width="${ANCHO - 4}" height="${ALTO - 4}" fill="none" stroke="#c8a24a" stroke-width="2" stroke-dasharray="3 2"/>` : '',
+    combatant.inspiration ? `<circle cx="${ANCHO - 7}" cy="7" r="3" fill="#ffb703"/>` : '',
+    niveles ? `<rect x="5" y="${ALTO - 5}" width="${niveles * 5}" height="2" fill="#d1495b"/>` : '',
+  ].join('');
+  return svg(rects, PALETA.fondo).replace('</svg>', `${decoracion}</svg>`);
 }
 
 /**
